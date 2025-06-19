@@ -1,0 +1,4 @@
+{
+  "name": "import-fixtures",
+  "schedule": "0 */6 * * *"  // every day at 6am UTC
+}
