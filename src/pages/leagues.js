@@ -89,7 +89,7 @@ export default function Leagues() {
 
   return (
     <div className="p-4 max-w-xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Your Fantasy Leagues</h1>
+      <h1 className="text-2xl font-bold mb-4">Your Leagues</h1>
 
       {leagues.length === 0 && <p>You haven’t joined or created any leagues.</p>}
 
