@@ -140,3 +140,5 @@ export default function Leagues() {
     </div>
   );
 }
+import { supabase } from '../lib/supabaseclient';
+import { supabase } from '../lib/supabase';
