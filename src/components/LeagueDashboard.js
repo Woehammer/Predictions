@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseclient';
-import Header from '../components/Header';
+import Header from './Header';
 
 export default function LeagueDashboard() {
   const [leagues, setLeagues] = useState([]);
