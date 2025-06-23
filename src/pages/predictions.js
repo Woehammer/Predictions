@@ -22,6 +22,7 @@ export default function Predictions() {
       const { data, error } = await supabase
         .from('fixtures')
         .select('*')
+        .gt('match_date', new Date().toISOString())
         .order('match_date', { ascending: true });
 
       if (!error) setFixtures(data);
