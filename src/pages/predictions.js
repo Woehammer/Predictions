@@ -22,8 +22,7 @@ export default function Predictions() {
       const { data, error } = await supabase
         .from('fixtures')
         .select('*')
-        .order('match_date', { ascending: true })
-        .limit(10);
+        .order('match_date', { ascending: true });
 
       if (!error) setFixtures(data);
     };
