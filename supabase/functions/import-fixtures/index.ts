@@ -6,7 +6,7 @@ serve(async (_req) => {
   const supabaseUrl = Deno.env.get("PROJECT_URL") || "";
   const supabaseKey = Deno.env.get("SERVICE_ROLE_KEY") || "";
   const footballApiKey = Deno.env.get("FOOTBALL_DATA_API_KEY") || "";
-  const season = 2023;
+  const season = 2025;
 
   if (!supabaseUrl || !supabaseKey || !footballApiKey) {
     console.error("Missing required environment variables");
