@@ -3,13 +3,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 serve(async (_req) => {
+  console.log("🟡 Function started");
+
   const supabaseUrl = Deno.env.get("PROJECT_URL") || "";
   const supabaseKey = Deno.env.get("SERVICE_ROLE_KEY") || "";
   const footballApiKey = Deno.env.get("FOOTBALL_DATA_API_KEY") || "";
   const season = 2025;
 
+  console.log("🔐 Environment vars loaded");
+
   if (!supabaseUrl || !supabaseKey || !footballApiKey) {
-    console.error("❌ Missing environment variables");
+    console.error("❌ Missing required environment variables");
     return new Response("Missing environment variables", { status: 500 });
   }
 
@@ -20,6 +24,8 @@ serve(async (_req) => {
     },
   });
 
+  console.log("📡 Fixtures fetched from football-data.org");
+
   if (!response.ok) {
     const text = await response.text();
     console.error("❌ Failed to fetch fixtures:", text);
@@ -27,13 +33,13 @@ serve(async (_req) => {
   }
 
   const { matches } = await response.json();
-  const now = new Date();
+  console.log(`📦 Total matches received: ${matches.length}`);
 
-  // Filter future fixtures
+  const now = new Date();
   const filteredFixtures = matches
     .filter((match: any) => new Date(match.utcDate) > now)
     .map((match: any) => ({
-      id: crypto.randomUUID(),
+      id: match.id,
       match_date: match.utcDate,
       status: match.status,
       matchday: match.matchday,
@@ -41,9 +47,8 @@ serve(async (_req) => {
       away_team: match.awayTeam.name,
     }));
 
-  console.log(`ℹ️ Inserting ${filteredFixtures.length} upcoming fixtures into Supabase`);
+  console.log(`✅ ${filteredFixtures.length} future fixtures to insert`);
 
-  // Upsert fixtures into Supabase
   const insertResponse = await fetch(`${supabaseUrl}/rest/v1/fixtures?on_conflict=id`, {
     method: "POST",
     headers: {
@@ -61,9 +66,6 @@ serve(async (_req) => {
     return new Response("Failed to insert fixtures", { status: 500 });
   }
 
-  console.log("✅ Fixtures imported successfully");
+  console.log("🎉 Fixtures inserted successfully");
   return new Response("Fixtures imported successfully", { status: 200 });
 });
-
-// Debug
-console.log("✅ Function completed. Fixtures processed:", filteredFixtures.length);
