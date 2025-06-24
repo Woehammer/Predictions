@@ -64,3 +64,6 @@ serve(async (_req) => {
   console.log("✅ Fixtures imported successfully");
   return new Response("Fixtures imported successfully", { status: 200 });
 });
+
+// Debug
+console.log("✅ Function completed. Fixtures processed:", filteredFixtures.length);
