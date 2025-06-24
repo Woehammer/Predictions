@@ -33,7 +33,7 @@ serve(async (_req) => {
   const filteredFixtures = matches
     .filter((match: any) => new Date(match.utcDate) > now)
     .map((match: any) => ({
-      id: match.id,
+      id: crypto.randomUUID(),
       match_date: match.utcDate,
       status: match.status,
       matchday: match.matchday,
