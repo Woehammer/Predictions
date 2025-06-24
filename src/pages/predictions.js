@@ -30,6 +30,9 @@ export default function Predictions() {
     fetchFixtures();
   }, []);
 
+  //Debug line
+  console.log("Loaded fixtures:", data);
+
   // Load user's saved predictions
   useEffect(() => {
     const fetchPredictions = async () => {
