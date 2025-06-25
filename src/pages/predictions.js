@@ -29,11 +29,6 @@ export default function Predictions() {
     };
     fetchFixtures();
   }, []);
-
-  // Debug line
-useEffect(() => {
-  console.log("Loaded fixtures:", fixtures);
-}, [fixtures]);
   
   // Load user's saved predictions
   useEffect(() => {
