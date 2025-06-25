@@ -193,3 +193,6 @@ export default function PredictionsPage() {
     </div>
   );
         }
+//Bottom of file
+export const dynamic =
+  'force-dynamic';
