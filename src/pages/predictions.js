@@ -191,4 +191,4 @@ export default function Predictions() {
     </div>
   );
 }
-// Build redeploy trigger
+// Force Vercel rebuild - debug checksum
