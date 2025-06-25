@@ -196,3 +196,5 @@ export default function PredictionsPage() {
 //Bottom of file
 export const dynamic =
   'force-dynamic';
+
+// Force rebuild: [timestamp]
