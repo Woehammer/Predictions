@@ -1,61 +1,67 @@
-'use client';
-
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseclient';
 
-export default function PredictionsPage() {
+export default function Predictions() {
   const [fixtures, setFixtures] = useState([]);
   const [predictions, setPredictions] = useState({});
   const [savedPredictions, setSavedPredictions] = useState({});
   const [user, setUser] = useState(null);
+  const [isClient, setIsClient] = useState(false);
+
+  // Ensure client-only rendering
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Get logged-in user
   useEffect(() => {
+    if (!isClient) return;
+
     const checkUser = async () => {
-      const result = await supabase.auth.getUser();
-      setUser(result?.data?.user ?? null);
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
     };
     checkUser();
-  }, []);
+  }, [isClient]);
 
   // Load fixtures
   useEffect(() => {
+    if (!isClient) return;
+
     const fetchFixtures = async () => {
-      const now = new Date().toISOString();
-      const result = await supabase
+      const { data, error } = await supabase
         .from('fixtures')
         .select('*')
-        .gt('match_date', now)
+        .gt('match_date', new Date().toISOString())
         .order('match_date', { ascending: true });
 
-      if (!result.error) {
-        setFixtures(result.data || []);
-      }
+      if (!error) setFixtures(data || []);
     };
     fetchFixtures();
-  }, []);
+  }, [isClient]);
 
   // Load saved predictions
   useEffect(() => {
-    const fetchPredictions = async () => {
-      if (!user) return;
+    if (!user || !isClient) return;
 
-      const result = await supabase
+    const fetchPredictions = async () => {
+      const { data, error } = await supabase
         .from('predictions')
         .select('*')
         .eq('user_id', user.id);
 
-      if (!result.error && result.data) {
+      if (!error && data) {
         const map = {};
-        for (const p of result.data) {
+        for (const p of data) {
           map[p.fixture_id] = p;
         }
         setSavedPredictions(map);
       }
     };
     fetchPredictions();
-  }, [user]);
+  }, [user, isClient]);
 
+  // Handle input change
   const handleInput = (fixtureId, team, value) => {
     setPredictions(prev => ({
       ...prev,
@@ -67,9 +73,10 @@ export default function PredictionsPage() {
     }));
   };
 
+  // Handle bonus toggle
   const handleBonusToggle = (fixtureId) => {
     const current = predictions[fixtureId]?.is_bonus || false;
-    const updated = {
+    const newPredictions = {
       ...predictions,
       [fixtureId]: {
         ...predictions[fixtureId],
@@ -77,15 +84,17 @@ export default function PredictionsPage() {
       },
     };
 
-    const bonusCount = Object.values(updated).filter(p => p.is_bonus).length;
-    if (bonusCount > Math.floor(fixtures.length / 5)) {
-      alert('You can only select one bonus prediction for every five games.');
+    const bonusCount = Object.values(newPredictions).filter(p => p.is_bonus).length;
+    const maxBonuses = Math.floor(fixtures.length / 5);
+    if (bonusCount > maxBonuses) {
+      alert(`You can only select one bonus prediction for every five games.`);
       return;
     }
 
-    setPredictions(updated);
+    setPredictions(newPredictions);
   };
 
+  // Submit prediction
   const handleSubmit = async (fixtureId) => {
     if (!user) {
       alert('You must be logged in to submit predictions.');
@@ -98,18 +107,18 @@ export default function PredictionsPage() {
       return;
     }
 
-    const result = await supabase.from('predictions').upsert({
-      fixture_id: fixtureId,
-      user_id: user.id,
-      predicted_home_score: parseInt(p.home),
-      predicted_away_score: parseInt(p.away),
-      is_bonus: p.is_bonus || false,
-    }, {
-      onConflict: ['user_id', 'fixture_id'],
-    });
+    const { error } = await supabase
+      .from('predictions')
+      .upsert({
+        fixture_id: fixtureId,
+        user_id: user.id,
+        predicted_home_score: parseInt(p.home),
+        predicted_away_score: parseInt(p.away),
+        is_bonus: p.is_bonus || false,
+      }, { onConflict: ['user_id', 'fixture_id'] });
 
-    if (result.error) {
-      alert('Error saving prediction: ' + result.error.message);
+    if (error) {
+      alert('Error saving prediction: ' + error.message);
     } else {
       alert('Prediction saved!');
       setSavedPredictions(prev => ({
@@ -123,6 +132,8 @@ export default function PredictionsPage() {
       }));
     }
   };
+
+  if (!isClient) return null;
 
   return (
     <div className="p-4 max-w-2xl mx-auto">
@@ -192,9 +203,4 @@ export default function PredictionsPage() {
       })}
     </div>
   );
-        }
-//Bottom of file
-export const dynamic =
-  'force-dynamic';
-
-// Force rebuild: [timestamp]
+}
