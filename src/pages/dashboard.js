@@ -1,3 +1,5 @@
+// pages/dashboard.js
+
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseclient';
 import Link from 'next/link';
@@ -7,104 +9,68 @@ export default function UserDashboard({ user }) {
   const [leagues, setLeagues] = useState([]);
   const [publicLeagues, setPublicLeagues] = useState([]);
   const [inviteCode, setInviteCode] = useState('');
-  const [leagueName, setLeagueName] = useState('');
-  const [makePublic, setMakePublic] = useState(false);
+  const [newLeagueName, setNewLeagueName] = useState('');
+  const [isPublic, setIsPublic] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [error, setError] = useState('');
   const [recentResults, setRecentResults] = useState([]);
   const [upcomingFixtures, setUpcomingFixtures] = useState([]);
 
-  const fetchData = async () => {
+  useEffect(() => {
     if (!user) return;
 
-    const { data: userLeagues, error: userLeaguesError } = await supabase
-      .from('league_members')
-      .select('leagues(id, name, is_public)')
-      .eq('user_id', user.id);
+    const fetchData = async () => {
+      const { data: userLeagues } = await supabase
+        .from('league_members')
+        .select('leagues(id, name, is_public, invite_code)')
+        .eq('user_id', user.id);
 
-    if (userLeaguesError) console.error('Error fetching user leagues:', userLeaguesError);
-    setLeagues(userLeagues?.map(l => l.leagues) || []);
+      setLeagues(userLeagues?.map(l => l.leagues) || []);
 
-    const { data: pointsData } = await supabase
-      .from('user_points')
-      .select('total_points')
-      .eq('user_id', user.id)
-      .single();
+      const { data: pointsData } = await supabase
+        .from('user_points')
+        .select('total_points')
+        .eq('user_id', user.id)
+        .single();
 
-    setPoints(pointsData?.total_points || 0);
+      setPoints(pointsData?.total_points || 0);
 
-    const { data: publicData } = await supabase
-      .from('leagues')
-      .select()
-      .eq('is_public', true);
+      const { data: publicData } = await supabase
+        .from('leagues')
+        .select()
+        .eq('is_public', true);
 
-    setPublicLeagues(publicData || []);
+      setPublicLeagues(publicData || []);
 
-    const { data: results } = await supabase
-      .from('predictions')
-      .select('fixtures(home_team, away_team, actual_home_score, actual_away_score), predicted_home_score, predicted_away_score')
-      .eq('user_id', user.id)
-      .not('fixtures.actual_home_score', 'is', null)
-      .order('created_at', { ascending: false })
-      .limit(5);
+      const { data: results } = await supabase
+        .from('predictions')
+        .select('fixtures(home_team, away_team, actual_home_score, actual_away_score), predicted_home_score, predicted_away_score')
+        .eq('user_id', user.id)
+        .not('fixtures.actual_home_score', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(5);
 
-    setRecentResults(results || []);
+      setRecentResults(results || []);
 
-    const { data: fixtures } = await supabase
-      .from('fixtures')
-      .select()
-      .gt('match_date', new Date().toISOString())
-      .order('match_date')
-      .limit(5);
+      const { data: fixtures } = await supabase
+        .from('fixtures')
+        .select()
+        .gt('match_date', new Date().toISOString())
+        .order('match_date')
+        .limit(5);
 
-    setUpcomingFixtures(fixtures || []);
-  };
+      setUpcomingFixtures(fixtures || []);
+    };
 
-  useEffect(() => {
     fetchData();
   }, [user]);
 
   const joinLeague = async () => {
-    if (!inviteCode) return;
-
-    const { error } = await supabase.rpc('join_league_by_code', {
+    await supabase.rpc('join_league_by_code', {
       user_id_input: user.id,
       invite_code_input: inviteCode,
     });
-
-    if (error) {
-      console.error('Join league error:', error.message);
-    } else {
-      setInviteCode('');
-      fetchData();
-    }
-  };
-
-  const createLeague = async () => {
-    if (!leagueName) return;
-
-    const { data, error } = await supabase
-      .from('leagues')
-      .insert({
-        name: leagueName,
-        creator_id: user.id,
-        is_public: makePublic,
-        invite_code: crypto.randomUUID().slice(0, 6), // or use a better invite code method
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Create league error:', error.message);
-      return;
-    }
-
-    await supabase.from('league_members').insert({
-      user_id: user.id,
-      league_id: data.id,
-    });
-
-    setLeagueName('');
-    setMakePublic(false);
-    fetchData();
+    setInviteCode('');
   };
 
   const leaveLeague = async (leagueId) => {
@@ -116,6 +82,53 @@ export default function UserDashboard({ user }) {
     setLeagues(leagues.filter(l => l.id !== leagueId));
   };
 
+  const createLeague = async () => {
+    setError('');
+    setSuccessMessage('');
+    if (!newLeagueName.trim()) {
+      setError('Please enter a league name.');
+      return;
+    }
+
+    const code = isPublic ? null : Math.random().toString(36).substr(2, 8).toUpperCase();
+
+    const { data, error } = await supabase
+      .from('leagues')
+      .insert([
+        {
+          name: newLeagueName,
+          is_public: isPublic,
+          invite_code: code,
+          creator_id: user.id,
+        },
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      setError('Failed to create league.');
+      console.error(error);
+      return;
+    }
+
+    const newLeague = data;
+
+    const { error: memberError } = await supabase
+      .from('league_members')
+      .insert([{ league_id: newLeague.id, user_id: user.id }]);
+
+    if (memberError) {
+      setError('League created, but failed to join.');
+      console.error(memberError);
+      return;
+    }
+
+    setNewLeagueName('');
+    setIsPublic(false);
+    setSuccessMessage(`League "${newLeague.name}" created! ${code ? 'Invite code: ' + code : ''}`);
+    setLeagues(prev => [...prev, newLeague]);
+  };
+
   return (
     <div className="p-4 max-w-3xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Welcome!</h1>
@@ -125,7 +138,12 @@ export default function UserDashboard({ user }) {
       <ul className="mb-4">
         {leagues.map(league => (
           <li key={league.id} className="flex justify-between items-center border-b py-2">
-            <span>{league.name}</span>
+            <div>
+              <span className="font-semibold">{league.name}</span>
+              {!league.is_public && league.invite_code && (
+                <span className="ml-2 text-xs text-gray-500">Invite Code: {league.invite_code}</span>
+              )}
+            </div>
             <button onClick={() => leaveLeague(league.id)} className="text-red-500 text-sm">Leave</button>
           </li>
         ))}
@@ -134,41 +152,38 @@ export default function UserDashboard({ user }) {
       <div className="mb-6">
         <input
           type="text"
-          value={leagueName}
-          onChange={e => setLeagueName(e.target.value)}
-          placeholder="New League Name"
+          value={inviteCode}
+          onChange={e => setInviteCode(e.target.value)}
+          placeholder="Enter invite code"
+          className="border px-2 py-1 mr-2"
+        />
+        <button onClick={joinLeague} className="bg-blue-500 text-white px-4 py-1 rounded">Join</button>
+      </div>
+
+      <div className="mb-6 border p-4 rounded bg-gray-50">
+        <h3 className="text-lg font-semibold mb-2">Create New League</h3>
+        {successMessage && <p className="text-green-600 mb-2">{successMessage}</p>}
+        {error && <p className="text-red-600 mb-2">{error}</p>}
+        <input
+          type="text"
+          value={newLeagueName}
+          onChange={e => setNewLeagueName(e.target.value)}
+          placeholder="League name"
           className="border px-2 py-1 w-full mb-2"
         />
-        <label className="block mb-2">
+        <label className="flex items-center space-x-2 mb-2">
           <input
             type="checkbox"
-            checked={makePublic}
-            onChange={e => setMakePublic(e.target.checked)}
-            className="mr-2"
+            checked={isPublic}
+            onChange={e => setIsPublic(e.target.checked)}
           />
-          Make Public
+          <span>Make this league public</span>
         </label>
         <button
           onClick={createLeague}
           className="bg-green-600 text-white px-4 py-2 rounded w-full"
         >
           Create League
-        </button>
-      </div>
-
-      <div className="mb-6">
-        <input
-          type="text"
-          value={inviteCode}
-          onChange={e => setInviteCode(e.target.value)}
-          placeholder="Enter Invite Code"
-          className="border px-2 py-1 w-full mb-2"
-        />
-        <button
-          onClick={joinLeague}
-          className="bg-blue-600 text-white px-4 py-2 rounded w-full"
-        >
-          Join
         </button>
       </div>
 
@@ -199,7 +214,9 @@ export default function UserDashboard({ user }) {
         ))}
       </ul>
 
-      <Link href="/predictions" className="block text-center bg-green-600 text-white px-4 py-2 rounded">Go to Predictions</Link>
+      <Link href="/predictions" className="block text-center bg-blue-700 text-white px-4 py-2 rounded">
+        Go to Predictions
+      </Link>
     </div>
   );
-}
+          }
