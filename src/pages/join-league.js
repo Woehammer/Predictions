@@ -1,7 +1,7 @@
 // File: src/pages/join-league.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { supabase } from '../lib/supabaseclient';
+import { supabase } from '../lib/supabaseClient';
 
 export default function JoinLeague() {
   const router = useRouter();
