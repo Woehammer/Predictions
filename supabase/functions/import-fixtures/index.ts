@@ -1,16 +1,9 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { type Fixture, fetchFixtures } from './fetch-fixtures.ts';
-
-const supabase = createClient(
-  Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-);
-
 Deno.serve(async () => {
   try {
     const fixtures: Fixture[] = await fetchFixtures();
 
     if (!fixtures.length) {
+      console.log('No fixtures returned from fetch.');
       return new Response('No fixtures found.', { status: 404 });
     }
 
@@ -19,13 +12,14 @@ Deno.serve(async () => {
       .upsert(fixtures, { onConflict: ['id'] });
 
     if (error) {
-      console.error('Upsert error:', error);
+      console.error('Supabase upsert error:', error.message, error.details);
       return new Response('Failed to insert fixtures', { status: 500 });
     }
 
     return new Response('Fixtures imported successfully', { status: 200 });
+
   } catch (err) {
-    console.error('Unexpected error:', err);
+    console.error('Unexpected edge function error:', err);
     return new Response('Unexpected error occurred', { status: 500 });
   }
 });
