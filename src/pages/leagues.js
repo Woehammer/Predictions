@@ -13,41 +13,36 @@ export default function Leagues() {
   useEffect(() => {
     const getUser = async () => {
       const { data: { user }, error } = await supabase.auth.getUser();
-      if (error) {
-        console.error('Error fetching user:', error);
-      } else {
-        console.log('Fetched user:', user);
-        setUser(user);
-      }
+      console.log('Fetched user:', user);
+      if (error) console.error('Error fetching user:', error);
+      setUser(user);
     };
     getUser();
   }, []);
 
   useEffect(() => {
-    if (user) fetchLeagues();
+    if (user) {
+      console.log('Triggering fetchLeagues for user:', user.id);
+      fetchLeagues();
+    }
   }, [user]);
 
   const fetchLeagues = async () => {
     const { data, error } = await supabase
       .from('league_members')
-      .select(`
-        league_id,
-        leagues (
-          id,
-          name,
-          invite_code
-        )
-      `)
+      .select('leagues(id, name, invite_code)')
       .eq('user_id', user.id);
 
-    if (error) {
-      console.error('Error fetching leagues:', error);
-      return;
-    }
+    console.log('League fetch result:', { data, error });
 
-    const leagueList = data.map(d => d.leagues);
-    setLeagues(leagueList);
-    fetchMembers(leagueList);
+    if (!error) {
+      const leagueList = data.map(d => d.leagues);
+      console.log('Mapped league list:', leagueList);
+      setLeagues(leagueList);
+      fetchMembers(leagueList);
+    } else {
+      console.error('Error fetching leagues:', error);
+    }
   };
 
   const fetchMembers = async (leagueList) => {
@@ -57,17 +52,16 @@ export default function Leagues() {
       .select('league_id, users(username, email)')
       .in('league_id', leagueIds);
 
-    if (error) {
+    if (!error) {
+      const grouped = {};
+      data.forEach(entry => {
+        if (!grouped[entry.league_id]) grouped[entry.league_id] = [];
+        grouped[entry.league_id].push(entry.users);
+      });
+      setMembers(grouped);
+    } else {
       console.error('Error fetching members:', error);
-      return;
     }
-
-    const grouped = {};
-    data.forEach(entry => {
-      if (!grouped[entry.league_id]) grouped[entry.league_id] = [];
-      grouped[entry.league_id].push(entry.users);
-    });
-    setMembers(grouped);
   };
 
   const createLeague = async () => {
@@ -76,7 +70,7 @@ export default function Leagues() {
       .from('leagues')
       .insert({
         name: newLeagueName,
-        creator_id: user.id,
+        created_by: user.id,
         invite_code,
       })
       .select();
@@ -115,12 +109,6 @@ export default function Leagues() {
   return (
     <div className="p-4 max-w-xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Your Leagues</h1>
-
-      {/* DEBUG BLOCK – remove later */}
-      <pre className="text-xs bg-gray-100 p-2 rounded mb-4">
-        user: {JSON.stringify(user, null, 2)}
-        leagues: {JSON.stringify(leagues, null, 2)}
-      </pre>
 
       {leagues.length === 0 && <p>You haven’t joined or created any leagues.</p>}
 
@@ -172,4 +160,4 @@ export default function Leagues() {
       </div>
     </div>
   );
-        }
+}
