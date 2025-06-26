@@ -53,12 +53,34 @@ export default function Leagues() {
   };
 
   const createLeague = async () => {
-    const invite_code = uuidv4().split('-')[0];
-    const { data, error } = await supabase.from('leagues').insert({
+    const invite_code =
+      uuidv4().split('-')[0];
+
+    const { data, error } = await supabase
+    .from('leagues')
+    .insert({
       name: newLeagueName,
       creator_id: user.id,
       invite_code,
-    }).select();
+    })
+    .select()
+    .single(); 
+
+    if (errpr || !data) {
+      console.error(error);
+      return;
+    }
+
+    //Ensure user is added as a league member
+    await
+    supabase.from('league_members').insert({
+      league_id: data.id,
+      user_id: user.id,
+      )};
+
+  setNewLeagueName(' ');
+  fetchLeagues();
+};
 
     if (!error && data.length > 0) {
       await supabase.from('league_members').insert({
