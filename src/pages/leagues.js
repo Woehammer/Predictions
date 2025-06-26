@@ -12,8 +12,13 @@ export default function Leagues() {
 
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error) {
+        console.error('Error fetching user:', error);
+      } else {
+        console.log('Fetched user:', user);
+        setUser(user);
+      }
     };
     getUser();
   }, []);
@@ -27,7 +32,7 @@ export default function Leagues() {
       .from('league_members')
       .select(`
         league_id,
-        leagues:leagues (
+        leagues (
           id,
           name,
           invite_code
@@ -35,13 +40,14 @@ export default function Leagues() {
       `)
       .eq('user_id', user.id);
 
-    if (!error && data) {
-      const leagueList = data.map(d => d.leagues).filter(Boolean);
-      setLeagues(leagueList);
-      fetchMembers(leagueList);
-    } else {
+    if (error) {
       console.error('Error fetching leagues:', error);
+      return;
     }
+
+    const leagueList = data.map(d => d.leagues);
+    setLeagues(leagueList);
+    fetchMembers(leagueList);
   };
 
   const fetchMembers = async (leagueList) => {
@@ -51,23 +57,29 @@ export default function Leagues() {
       .select('league_id, users(username, email)')
       .in('league_id', leagueIds);
 
-    if (!error) {
-      const grouped = {};
-      data.forEach(entry => {
-        if (!grouped[entry.league_id]) grouped[entry.league_id] = [];
-        grouped[entry.league_id].push(entry.users);
-      });
-      setMembers(grouped);
+    if (error) {
+      console.error('Error fetching members:', error);
+      return;
     }
+
+    const grouped = {};
+    data.forEach(entry => {
+      if (!grouped[entry.league_id]) grouped[entry.league_id] = [];
+      grouped[entry.league_id].push(entry.users);
+    });
+    setMembers(grouped);
   };
 
   const createLeague = async () => {
     const invite_code = uuidv4().split('-')[0];
-    const { data, error } = await supabase.from('leagues').insert({
-      name: newLeagueName,
-      creator_id: user.id,
-      invite_code,
-    }).select();
+    const { data, error } = await supabase
+      .from('leagues')
+      .insert({
+        name: newLeagueName,
+        creator_id: user.id,
+        invite_code,
+      })
+      .select();
 
     if (!error && data.length > 0) {
       await supabase.from('league_members').insert({
@@ -76,6 +88,8 @@ export default function Leagues() {
       });
       setNewLeagueName('');
       fetchLeagues();
+    } else {
+      console.error('Error creating league:', error);
     }
   };
 
@@ -93,6 +107,8 @@ export default function Leagues() {
       });
       setJoinCode('');
       fetchLeagues();
+    } else {
+      console.error('Error joining league:', error);
     }
   };
 
@@ -100,13 +116,21 @@ export default function Leagues() {
     <div className="p-4 max-w-xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Your Leagues</h1>
 
+      {/* DEBUG BLOCK – remove later */}
+      <pre className="text-xs bg-gray-100 p-2 rounded mb-4">
+        user: {JSON.stringify(user, null, 2)}
+        leagues: {JSON.stringify(leagues, null, 2)}
+      </pre>
+
       {leagues.length === 0 && <p>You haven’t joined or created any leagues.</p>}
 
       <ul className="mb-6">
         {leagues.map(l => (
           <li key={l.id} className="mb-4 border p-3 rounded">
             <div className="font-bold">{l.name}</div>
-            <div className="text-sm text-gray-500 mb-1">Invite Code: <code>{l.invite_code}</code></div>
+            <div className="text-sm text-gray-500 mb-1">
+              Invite Code: <code>{l.invite_code}</code>
+            </div>
             <div className="text-sm font-semibold">Members:</div>
             <ul className="pl-4 list-disc text-sm">
               {(members[l.id] || []).map(m => (
@@ -148,4 +172,4 @@ export default function Leagues() {
       </div>
     </div>
   );
-    }
+        }
