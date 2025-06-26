@@ -1,100 +1,103 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { supabase } from '@/lib/supabaseclient';
 import { useRouter } from 'next/router';
-import { supabase } from '../lib/supabaseclient';
+import { useUser } from '@supabase/auth-helpers-react';
 
 export default function CreateLeague() {
+  const user = useUser();
   const router = useRouter();
-  const [user, setUser] = useState(null);
-  const [leagueName, setLeagueName] = useState('');
-  const [isPublic, setIsPublic] = useState(true);
-  const [success, setSuccess] = useState('');
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/auth/login');
-      } else {
-        setUser(user);
-      }
-    };
-    fetchUser();
-  }, []);
-
-  const generateInviteCode = () => {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
-  };
+  const [name, setName] = useState('');
+  const [isPublic, setIsPublic] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
 
-    if (!leagueName.trim()) {
-      setError('League name is required');
+    if (!name.trim()) {
+      setError('League name is required.');
       return;
     }
 
-    const inviteCode = isPublic ? null : generateInviteCode();
+    const code = isPublic ? null : Math.random().toString(36).substr(2, 8).toUpperCase();
 
     const { data, error } = await supabase
       .from('leagues')
-      .insert([{
-        name: leagueName,
-        is_public: isPublic,
-        invite_code: inviteCode
-      }])
+      .insert([{ name, is_public: isPublic, invite_code: code }])
       .select()
       .single();
 
-  if (error) {
-  console.error('Supabase error:', error);
-  setError(`Failed to create league: ${error.message}`);
-  return;
-  }
+    if (error) {
+      console.error(error);
+      setError('Failed to create league.');
+      return;
+    }
 
-    await supabase.from('league_members').insert([
-      {
-        league_id: data.id,
-        user_id: user.id
-      }
+    const newLeague = data;
+
+    // Add the user as a league member
+    const { error: memberError } = await supabase.from('league_members').insert([
+      { user_id: user.id, league_id: newLeague.id }
     ]);
 
-    setSuccess(`League created${inviteCode ? ` with invite code: ${inviteCode}` : ''}`);
-    setLeagueName('');
+    if (memberError) {
+      console.error(memberError);
+      setError('League created, but failed to join.');
+      return;
+    }
+
+    setInviteCode(code);
+    setSuccess(true);
+    setError(false);
+    setName('');
   };
 
-  if (!user) return null;
+  if (!user) {
+    return <p className="p-4">Please log in to create a league.</p>;
+  }
 
   return (
     <div className="p-4 max-w-xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Create New League</h1>
+      <h1 className="text-2xl font-bold mb-4">Create a New League</h1>
 
-      {success && <p className="text-green-600 mb-4">{success}</p>}
-      {error && <p className="text-red-600 mb-4">{error}</p>}
+      {success && (
+        <div className="mb-4 text-green-700 bg-green-100 border border-green-300 p-2 rounded">
+          League created successfully!
+          {!isPublic && inviteCode && (
+            <p className="mt-2">Invite Code: <strong>{inviteCode}</strong></p>
+          )}
+        </div>
+      )}
 
-      <form onSubmit={handleSubmit}>
-        <label className="block mb-2">
-          League Name
+      {error && (
+        <div className="mb-4 text-red-700 bg-red-100 border border-red-300 p-2 rounded">
+          {error}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block font-medium">League Name</label>
           <input
             type="text"
-            value={leagueName}
-            onChange={(e) => setLeagueName(e.target.value)}
-            className="border w-full px-3 py-2 mt-1"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            className="border px-3 py-2 rounded w-full"
+            placeholder="e.g. Fantasy Premier League"
             required
           />
-        </label>
+        </div>
 
-        <label className="block mb-4">
+        <div className="flex items-center space-x-2">
           <input
             type="checkbox"
             checked={isPublic}
-            onChange={(e) => setIsPublic(e.target.checked)}
-            className="mr-2"
+            onChange={e => setIsPublic(e.target.checked)}
+            id="public"
           />
-          Public League
-        </label>
+          <label htmlFor="public" className="text-sm">Make this league public</label>
+        </div>
 
         <button
           type="submit"
@@ -105,4 +108,4 @@ export default function CreateLeague() {
       </form>
     </div>
   );
-      }
+                                       }
