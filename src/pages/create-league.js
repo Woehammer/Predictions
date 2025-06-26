@@ -111,3 +111,22 @@ export default function CreateLeague({ user }) {
     </div>
   );
         }
+import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs';
+
+export async function getServerSideProps(ctx) {
+  const supabase = createServerSupabaseClient(ctx);
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      redirect: {
+        destination: '/auth/login',
+        permanent: false,
+      },
+    };
+  }
+
+  return {
+    props: { user },
+  };
+}
