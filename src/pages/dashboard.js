@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'; import { supabase } from '@/utils/supabaseClient'; import Link from 'next/link';
+import { useEffect, useState } from 'react'; import { supabase } from '@/lib/supabaseClient'; import Link from 'next/link';
 
 export default function UserDashboard({ user }) { const [points, setPoints] = useState(0); const [leagues, setLeagues] = useState([]); const [publicLeagues, setPublicLeagues] = useState([]); const [inviteCode, setInviteCode] = useState(''); const [recentResults, setRecentResults] = useState([]); const [upcomingFixtures, setUpcomingFixtures] = useState([]);
 
