@@ -12,10 +12,13 @@ export default function Leagues() {
 
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      console.log('Fetched user:', user);
-      if (error) console.error('Error fetching user:', error);
-      setUser(user);
+      const { data, error } = await supabase.auth.getUser();
+      if (error) {
+        console.error('Error fetching user:', error.message);
+      } else {
+        console.log('Fetched user:', data.user);
+        setUser(data.user);
+      }
     };
     getUser();
   }, []);
@@ -30,37 +33,35 @@ export default function Leagues() {
   const fetchLeagues = async () => {
     const { data, error } = await supabase
       .from('league_members')
-      .select('leagues(id, name, invite_code)')
+      .select('leagues!league_id(id, name, invite_code)')
       .eq('user_id', user.id);
 
-    console.log('League fetch result:', { data, error });
-
-    if (!error) {
-      const leagueList = data.map(d => d.leagues);
-      console.log('Mapped league list:', leagueList);
+    if (error) {
+      console.error('Error fetching leagues:', error);
+    } else {
+      console.log('League fetch result:', data);
+      const leagueList = data.map((d) => d.leagues);
       setLeagues(leagueList);
       fetchMembers(leagueList);
-    } else {
-      console.error('Error fetching leagues:', error);
     }
   };
 
   const fetchMembers = async (leagueList) => {
-    const leagueIds = leagueList.map(l => l.id);
+    const leagueIds = leagueList.map((l) => l.id);
     const { data, error } = await supabase
       .from('league_members')
       .select('league_id, users(username, email)')
       .in('league_id', leagueIds);
 
-    if (!error) {
+    if (error) {
+      console.error('Error fetching members:', error.message);
+    } else {
       const grouped = {};
-      data.forEach(entry => {
+      data.forEach((entry) => {
         if (!grouped[entry.league_id]) grouped[entry.league_id] = [];
         grouped[entry.league_id].push(entry.users);
       });
       setMembers(grouped);
-    } else {
-      console.error('Error fetching members:', error);
     }
   };
 
@@ -70,20 +71,23 @@ export default function Leagues() {
       .from('leagues')
       .insert({
         name: newLeagueName,
-        created_by: user.id,
+        creator_id: user.id,
         invite_code,
       })
       .select();
 
-    if (!error && data.length > 0) {
+    if (error) {
+      console.error('Error creating league:', error.message);
+      return;
+    }
+
+    if (data && data.length > 0) {
       await supabase.from('league_members').insert({
         league_id: data[0].id,
         user_id: user.id,
       });
       setNewLeagueName('');
       fetchLeagues();
-    } else {
-      console.error('Error creating league:', error);
     }
   };
 
@@ -94,16 +98,18 @@ export default function Leagues() {
       .eq('invite_code', joinCode)
       .single();
 
-    if (!error) {
-      await supabase.from('league_members').insert({
-        league_id: data.id,
-        user_id: user.id,
-      });
-      setJoinCode('');
-      fetchLeagues();
-    } else {
-      console.error('Error joining league:', error);
+    if (error) {
+      console.error('Error finding league with code:', joinCode, error.message);
+      return;
     }
+
+    await supabase.from('league_members').insert({
+      league_id: data.id,
+      user_id: user.id,
+    });
+
+    setJoinCode('');
+    fetchLeagues();
   };
 
   return (
@@ -113,7 +119,7 @@ export default function Leagues() {
       {leagues.length === 0 && <p>You haven’t joined or created any leagues.</p>}
 
       <ul className="mb-6">
-        {leagues.map(l => (
+        {leagues.map((l) => (
           <li key={l.id} className="mb-4 border p-3 rounded">
             <div className="font-bold">{l.name}</div>
             <div className="text-sm text-gray-500 mb-1">
@@ -121,7 +127,7 @@ export default function Leagues() {
             </div>
             <div className="text-sm font-semibold">Members:</div>
             <ul className="pl-4 list-disc text-sm">
-              {(members[l.id] || []).map(m => (
+              {(members[l.id] || []).map((m) => (
                 <li key={m.email}>{m.username || m.email}</li>
               ))}
             </ul>
@@ -134,7 +140,7 @@ export default function Leagues() {
           className="border p-2 w-full mb-2"
           placeholder="New League Name"
           value={newLeagueName}
-          onChange={e => setNewLeagueName(e.target.value)}
+          onChange={(e) => setNewLeagueName(e.target.value)}
         />
         <button
           className="bg-green-600 text-white px-4 py-2 rounded w-full"
@@ -149,7 +155,7 @@ export default function Leagues() {
           className="border p-2 w-full mb-2"
           placeholder="Enter Invite Code"
           value={joinCode}
-          onChange={e => setJoinCode(e.target.value)}
+          onChange={(e) => setJoinCode(e.target.value)}
         />
         <button
           className="bg-blue-600 text-white px-4 py-2 rounded w-full"
@@ -160,4 +166,4 @@ export default function Leagues() {
       </div>
     </div>
   );
-}
+        }
