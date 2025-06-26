@@ -1,71 +1,67 @@
 // supabase/functions/import-fixtures/index.ts
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 
-serve(async (_req) => {
-  console.log("🟡 Function started");
+console.log("Import Fixtures Function Started")
 
-  const supabaseUrl = Deno.env.get("PROJECT_URL") || "";
-  const supabaseKey = Deno.env.get("SERVICE_ROLE_KEY") || "";
-  const footballApiKey = Deno.env.get("FOOTBALL_DATA_API_KEY") || "";
-  const season = 2025;
+serve(async (req) => {
+  const apiKey = Deno.env.get("FOOTBALL_DATA_API_KEY")
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")
+  const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
 
-  console.log("🔐 Environment vars loaded");
-
-  if (!supabaseUrl || !supabaseKey || !footballApiKey) {
-    console.error("❌ Missing required environment variables");
-    return new Response("Missing environment variables", { status: 500 });
+  if (!apiKey || !supabaseUrl || !supabaseServiceRoleKey) {
+    console.error("Missing environment variables")
+    return new Response("Missing env vars", { status: 500 })
   }
 
-  // Fetch fixtures from Football-Data.org
-  const response = await fetch(`https://api.football-data.org/v4/competitions/PL/matches?season=${season}`, {
+  const competitionId = 2021 // Premier League
+  const season = 2025
+  const apiUrl = `https://api.football-data.org/v4/competitions/${competitionId}/matches?season=${season}`
+
+  const fetchResponse = await fetch(apiUrl, {
     headers: {
-      "X-Auth-Token": footballApiKey,
+      'X-Auth-Token': apiKey,
     },
-  });
+  })
 
-  console.log("📡 Fixtures fetched from football-data.org");
-
-  if (!response.ok) {
-    const text = await response.text();
-    console.error("❌ Failed to fetch fixtures:", text);
-    return new Response("Failed to fetch fixtures", { status: 500 });
+  if (!fetchResponse.ok) {
+    console.error("Failed to fetch data", await fetchResponse.text())
+    return new Response("Failed to fetch fixtures", { status: 500 })
   }
 
-  const { matches } = await response.json();
-  console.log(`📦 Total matches received: ${matches.length}`);
+  const data = await fetchResponse.json()
 
-  const now = new Date();
-  const filteredFixtures = matches
-    .filter((match: any) => new Date(match.utcDate) > now)
-    .map((match: any) => ({
-      id: match.id,
-      match_date: match.utcDate,
-      status: match.status,
-      matchday: match.matchday,
-      home_team: match.homeTeam.name,
-      away_team: match.awayTeam.name,
-    }));
+  const matches = data.matches.filter((match: any) => match.status !== "POSTPONED")
 
-  console.log(`✅ ${filteredFixtures.length} future fixtures to insert`);
+  const payload = matches.map((match: any) => ({
+    id: match.id,
+    utc_date: match.utcDate,
+    home_team: match.homeTeam.name,
+    away_team: match.awayTeam.name,
+    home_team_id: match.homeTeam.id,
+    away_team_id: match.awayTeam.id,
+    matchday: match.matchday,
+    status: match.status,
+    competition_id: competitionId,
+    season: season,
+  }))
 
-  const insertResponse = await fetch(`${supabaseUrl}/rest/v1/fixtures?on_conflict=id`, {
+  const response = await fetch(`${supabaseUrl}/rest/v1/fixtures`, {
     method: "POST",
     headers: {
-      "apikey": supabaseKey,
-      "Authorization": `Bearer ${supabaseKey}`,
       "Content-Type": "application/json",
-      "Prefer": "resolution=merge-duplicates,return=representation"
+      "apikey": supabaseServiceRoleKey,
+      "Authorization": `Bearer ${supabaseServiceRoleKey}`,
+      "Prefer": "resolution=merge-duplicates",
     },
-    body: JSON.stringify(filteredFixtures),
-  });
+    body: JSON.stringify(payload),
+  })
 
-  if (!insertResponse.ok) {
-    const errorText = await insertResponse.text();
-    console.error("❌ Failed to insert fixtures:", insertResponse.status, errorText);
-    return new Response("Failed to insert fixtures", { status: 500 });
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error("Failed to upsert fixtures", errorText)
+    return new Response("Upsert failed", { status: 500 })
   }
 
-  console.log("🎉 Fixtures inserted successfully");
-  return new Response("Fixtures imported successfully", { status: 200 });
-});
+  return new Response(`Imported ${payload.length} fixtures for season ${season}`, { status: 200 })
+})
