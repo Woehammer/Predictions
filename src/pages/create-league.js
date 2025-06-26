@@ -48,10 +48,11 @@ export default function CreateLeague() {
       .select()
       .single();
 
-    if (error) {
-      setError('Failed to create league');
-      return;
-    }
+  if (error) {
+  console.error('Supabase error:', error);
+  setError(`Failed to create league: ${error.message}`);
+  return;
+  }
 
     await supabase.from('league_members').insert([
       {
