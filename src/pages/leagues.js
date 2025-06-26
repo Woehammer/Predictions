@@ -25,11 +25,18 @@ export default function Leagues() {
   const fetchLeagues = async () => {
     const { data, error } = await supabase
       .from('league_members')
-      .select('leagues(id, name, invite_code)')
+      .select(`
+        league_id,
+        leagues:leagues (
+          id,
+          name,
+          invite_code
+        )
+      `)
       .eq('user_id', user.id);
 
     if (!error && data) {
-      const leagueList = data.map(d => d.leagues);
+      const leagueList = data.map(d => d.leagues).filter(Boolean);
       setLeagues(leagueList);
       fetchMembers(leagueList);
     } else {
@@ -44,43 +51,32 @@ export default function Leagues() {
       .select('league_id, users(username, email)')
       .in('league_id', leagueIds);
 
-    if (!error && data) {
+    if (!error) {
       const grouped = {};
       data.forEach(entry => {
         if (!grouped[entry.league_id]) grouped[entry.league_id] = [];
         grouped[entry.league_id].push(entry.users);
       });
       setMembers(grouped);
-    } else {
-      console.error('Error fetching members:', error);
     }
   };
 
   const createLeague = async () => {
     const invite_code = uuidv4().split('-')[0];
+    const { data, error } = await supabase.from('leagues').insert({
+      name: newLeagueName,
+      creator_id: user.id,
+      invite_code,
+    }).select();
 
-    const { data, error } = await supabase
-      .from('leagues')
-      .insert({
-        name: newLeagueName,
-        creator_id: user.id,
-        invite_code,
-      })
-      .select()
-      .single();
-
-    if (error || !data) {
-      console.error('Error creating league:', error);
-      return;
+    if (!error && data.length > 0) {
+      await supabase.from('league_members').insert({
+        league_id: data[0].id,
+        user_id: user.id,
+      });
+      setNewLeagueName('');
+      fetchLeagues();
     }
-
-    await supabase.from('league_members').insert({
-      league_id: data.id,
-      user_id: user.id,
-    });
-
-    setNewLeagueName('');
-    fetchLeagues();
   };
 
   const joinLeague = async () => {
@@ -90,15 +86,13 @@ export default function Leagues() {
       .eq('invite_code', joinCode)
       .single();
 
-    if (!error && data) {
+    if (!error) {
       await supabase.from('league_members').insert({
         league_id: data.id,
         user_id: user.id,
       });
       setJoinCode('');
       fetchLeagues();
-    } else {
-      console.error('Error joining league:', error);
     }
   };
 
@@ -154,4 +148,4 @@ export default function Leagues() {
       </div>
     </div>
   );
-        }
+    }
