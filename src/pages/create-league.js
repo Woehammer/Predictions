@@ -1,90 +1,107 @@
-import { useState } from 'react'; import { supabase } from '@/lib/supabaseclient'; import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
+import { supabase } from '../lib/supabaseclient';
 
-export default function CreateLeague({ user }) { const [name, setName] = useState(''); const [isPublic, setIsPublic] = useState(true); const [inviteCode, setInviteCode] = useState(''); const [message, setMessage] = useState('');
+export default function CreateLeague() {
+  const router = useRouter();
+  const [user, setUser] = useState(null);
+  const [leagueName, setLeagueName] = useState('');
+  const [isPublic, setIsPublic] = useState(true);
+  const [success, setSuccess] = useState('');
+  const [error, setError] = useState('');
 
-const handleSubmit = async (e) => { e.preventDefault();
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push('/auth/login');
+      } else {
+        setUser(user);
+      }
+    };
+    fetchUser();
+  }, []);
 
-if (!name.trim()) {
-  setMessage('League name is required.');
-  return;
-}
+  const generateInviteCode = () => {
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
+  };
 
-const { data, error } = await supabase.from('leagues').insert({
-  name,
-  is_public: isPublic,
-  invite_code: isPublic ? null : inviteCode || crypto.randomUUID(),
-  created_by: user.id,
-}).select().single();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
 
-if (error) {
-  console.error(error);
-  setMessage('Error creating league.');
-} else {
-  // Auto-join the user to their created league
-  await supabase.from('league_members').insert({
-    user_id: user.id,
-    league_id: data.id,
-  });
-  setMessage('League created successfully!');
-  setName('');
-  setInviteCode('');
-}
+    if (!leagueName.trim()) {
+      setError('League name is required');
+      return;
+    }
 
-};
+    const inviteCode = isPublic ? null : generateInviteCode();
 
-return ( <div className="p-4 max-w-xl mx-auto"> <h1 className="text-2xl font-bold mb-4">Create a New League</h1> {message && <p className="mb-4 text-green-600">{message}</p>}
+    const { data, error } = await supabase
+      .from('leagues')
+      .insert([{
+        name: leagueName,
+        is_public: isPublic,
+        invite_code: inviteCode
+      }])
+      .select()
+      .single();
 
-<form onSubmit={handleSubmit} className="space-y-4">
-    <div>
-      <label className="block font-medium">League Name</label>
-      <input
-        type="text"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        className="w-full border p-2 rounded"
-        required
-      />
+    if (error) {
+      setError('Failed to create league');
+      return;
+    }
+
+    await supabase.from('league_members').insert([
+      {
+        league_id: data.id,
+        user_id: user.id
+      }
+    ]);
+
+    setSuccess(`League created${inviteCode ? ` with invite code: ${inviteCode}` : ''}`);
+    setLeagueName('');
+  };
+
+  if (!user) return null;
+
+  return (
+    <div className="p-4 max-w-xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">Create New League</h1>
+
+      {success && <p className="text-green-600 mb-4">{success}</p>}
+      {error && <p className="text-red-600 mb-4">{error}</p>}
+
+      <form onSubmit={handleSubmit}>
+        <label className="block mb-2">
+          League Name
+          <input
+            type="text"
+            value={leagueName}
+            onChange={(e) => setLeagueName(e.target.value)}
+            className="border w-full px-3 py-2 mt-1"
+            required
+          />
+        </label>
+
+        <label className="block mb-4">
+          <input
+            type="checkbox"
+            checked={isPublic}
+            onChange={(e) => setIsPublic(e.target.checked)}
+            className="mr-2"
+          />
+          Public League
+        </label>
+
+        <button
+          type="submit"
+          className="bg-blue-600 text-white px-4 py-2 rounded"
+        >
+          Create League
+        </button>
+      </form>
     </div>
-
-    <div>
-      <label className="block font-medium">League Visibility</label>
-      <select
-        value={isPublic ? 'public' : 'private'}
-        onChange={(e) => setIsPublic(e.target.value === 'public')}
-        className="w-full border p-2 rounded"
-      >
-        <option value="public">Public</option>
-        <option value="private">Private (Invite Code Required)</option>
-      </select>
-    </div>
-
-    {!isPublic && (
-      <div>
-        <label className="block font-medium">Invite Code (optional)</label>
-        <input
-          type="text"
-          value={inviteCode}
-          onChange={(e) => setInviteCode(e.target.value)}
-          className="w-full border p-2 rounded"
-        />
-        <p className="text-sm text-gray-500">Leave blank to auto-generate a code.</p>
-      </div>
-    )}
-
-    <button
-      type="submit"
-      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-    >
-      Create League
-    </button>
-  </form>
-</div>
-
-); }
-
-export async function getServerSideProps(ctx) { const supabase = createServerSupabaseClient(ctx); const { data: { user }, } = await supabase.auth.getUser();
-
-if (!user) { return { redirect: { destination: '/auth/login', permanent: false, }, }; }
-
-return { props: { user }, }; }
-
+  );
+      }
