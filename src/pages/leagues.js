@@ -1,6 +1,6 @@
 // pages/leagues.js
 import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabaseclient';
+import { supabase } from '../lib/supabaseClient';
 import { v4 as uuidv4 } from 'uuid';
 
 export default function Leagues() {
