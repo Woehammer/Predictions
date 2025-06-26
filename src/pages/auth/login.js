@@ -17,7 +17,7 @@ export default function Login() {
       alert('Login failed: ' + error.message);
     } else {
       alert('Logged in!');
-      router.push('/predictions');
+      router.push('/dashboard');
     }
   };
 
