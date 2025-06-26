@@ -1,206 +1,159 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabaseclient';
+import { supabase } from '@/lib/supabaseclient';
+import { useUser } from '@supabase/auth-helpers-react';
+import dayjs from 'dayjs';
 
-export default function Predictions() {
+export default function PredictionsPage() {
+  const user = useUser();
   const [fixtures, setFixtures] = useState([]);
+  const [gameWeeks, setGameWeeks] = useState([]);
+  const [selectedWeekIndex, setSelectedWeekIndex] = useState(0);
   const [predictions, setPredictions] = useState({});
-  const [savedPredictions, setSavedPredictions] = useState({});
-  const [user, setUser] = useState(null);
-  const [isClient, setIsClient] = useState(false);
+  const [bonusPicks, setBonusPicks] = useState({});
+  const [scores, setScores] = useState({});
 
-  // Ensure client-only rendering
   useEffect(() => {
-    setIsClient(true);
-  }, []);
+    if (user) fetchFixtures();
+  }, [user]);
 
-  // Get logged-in user
-  useEffect(() => {
-    if (!isClient) return;
+  const fetchFixtures = async () => {
+    const { data: fixturesData } = await supabase
+      .from('fixtures')
+      .select('*')
+      .order('match_date');
 
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-    };
-    checkUser();
-  }, [isClient]);
+    const grouped = groupFixturesByWeek(fixturesData);
+    setGameWeeks(grouped);
+  };
 
-  // Load fixtures
-  useEffect(() => {
-    if (!isClient) return;
+  const groupFixturesByWeek = (fixtures) => {
+    if (!fixtures.length) return [];
 
-    const fetchFixtures = async () => {
-      const { data, error } = await supabase
-        .from('fixtures')
-        .select('*')
-        .gt('match_date', new Date().toISOString())
-        .order('match_date', { ascending: true });
+    const weeks = [];
+    let currentWeek = [];
+    let currentStart = dayjs(fixtures[0].match_date).startOf('week');
 
-      if (!error) setFixtures(data || []);
-    };
-    fetchFixtures();
-  }, [isClient]);
-
-  // Load saved predictions
-  useEffect(() => {
-    if (!user || !isClient) return;
-
-    const fetchPredictions = async () => {
-      const { data, error } = await supabase
-        .from('predictions')
-        .select('*')
-        .eq('user_id', user.id);
-
-      if (!error && data) {
-        const map = {};
-        for (const p of data) {
-          map[p.fixture_id] = p;
-        }
-        setSavedPredictions(map);
+    fixtures.forEach((fixture) => {
+      const date = dayjs(fixture.match_date);
+      if (date.isAfter(currentStart.add(7, 'day'))) {
+        weeks.push(currentWeek);
+        currentWeek = [];
+        currentStart = date.startOf('week');
       }
-    };
-    fetchPredictions();
-  }, [user, isClient]);
+      currentWeek.push(fixture);
+    });
 
-  // Handle input change
-  const handleInput = (fixtureId, team, value) => {
+    if (currentWeek.length) weeks.push(currentWeek);
+    return weeks;
+  };
+
+  const handlePredictionChange = (fixtureId, field, value) => {
     setPredictions(prev => ({
       ...prev,
       [fixtureId]: {
         ...prev[fixtureId],
-        [team]: value,
-        is_bonus: prev[fixtureId]?.is_bonus ?? false,
+        [field]: value,
       },
     }));
   };
 
-  // Handle bonus toggle
-  const handleBonusToggle = (fixtureId) => {
-    const current = predictions[fixtureId]?.is_bonus || false;
-    const newPredictions = {
-      ...predictions,
-      [fixtureId]: {
-        ...predictions[fixtureId],
-        is_bonus: !current,
-      },
-    };
+  const toggleBonus = (fixtureId) => {
+    const weekFixtures = gameWeeks[selectedWeekIndex];
+    const currentBonusCount = Object.values(bonusPicks).filter(b => b === true).length;
+    const maxBonuses = Math.floor(weekFixtures.length / 5);
 
-    const bonusCount = Object.values(newPredictions).filter(p => p.is_bonus).length;
-    const maxBonuses = Math.floor(fixtures.length / 5);
-    if (bonusCount > maxBonuses) {
-      alert(`You can only select one bonus prediction for every five games.`);
-      return;
-    }
+    if (!bonusPicks[fixtureId] && currentBonusCount >= maxBonuses) return;
 
-    setPredictions(newPredictions);
+    setBonusPicks(prev => ({
+      ...prev,
+      [fixtureId]: !prev[fixtureId],
+    }));
   };
 
-  // Submit prediction
-  const handleSubmit = async (fixtureId) => {
-    if (!user) {
-      alert('You must be logged in to submit predictions.');
-      return;
-    }
+  const savePredictions = async () => {
+    const weekFixtures = gameWeeks[selectedWeekIndex];
 
-    const p = predictions[fixtureId];
-    if (!p?.home || !p?.away) {
-      alert('Please enter both scores.');
-      return;
-    }
+    for (const fixture of weekFixtures) {
+      const prediction = predictions[fixture.id];
+      if (!prediction) continue;
 
-    const { error } = await supabase
-      .from('predictions')
-      .upsert({
-        fixture_id: fixtureId,
-        user_id: user.id,
-        predicted_home_score: parseInt(p.home),
-        predicted_away_score: parseInt(p.away),
-        is_bonus: p.is_bonus || false,
-      }, { onConflict: ['user_id', 'fixture_id'] });
+      const { error } = await supabase
+        .from('predictions')
+        .upsert({
+          fixture_id: fixture.id,
+          user_id: user.id,
+          predicted_home_score: prediction.home,
+          predicted_away_score: prediction.away,
+          is_bonus: !!bonusPicks[fixture.id],
+        });
 
-    if (error) {
-      alert('Error saving prediction: ' + error.message);
-    } else {
-      alert('Prediction saved!');
-      setSavedPredictions(prev => ({
-        ...prev,
-        [fixtureId]: {
-          fixture_id: fixtureId,
-          predicted_home_score: parseInt(p.home),
-          predicted_away_score: parseInt(p.away),
-          is_bonus: p.is_bonus || false,
-        },
-      }));
+      if (error) console.error('Prediction error:', error);
     }
   };
 
-  if (!isClient) return null;
+  const week = gameWeeks[selectedWeekIndex] || [];
 
   return (
-    <div className="p-4 max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Submit Your Predictions</h1>
-      {fixtures.length === 0 && <p>No fixtures found.</p>}
+    <div className="p-4 max-w-3xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">Predictions - Game Week {selectedWeekIndex + 1}</h1>
 
-      {fixtures.map(fixture => {
-        const saved = savedPredictions[fixture.id];
-        const current = predictions[fixture.id] || {};
-        const matchDate = new Date(fixture.match_date);
-        const locked = matchDate < new Date();
+      <div className="flex justify-between mb-4">
+        <button
+          onClick={() => setSelectedWeekIndex(i => Math.max(i - 1, 0))}
+          disabled={selectedWeekIndex === 0}
+          className="bg-gray-300 px-3 py-1 rounded"
+        >
+          Previous
+        </button>
+        <button
+          onClick={() => setSelectedWeekIndex(i => Math.min(i + 1, gameWeeks.length - 1))}
+          disabled={selectedWeekIndex === gameWeeks.length - 1}
+          className="bg-gray-300 px-3 py-1 rounded"
+        >
+          Next
+        </button>
+      </div>
 
-        return (
-          <div key={fixture.id} className="mb-6 border p-4 rounded shadow">
-            <h2 className="font-bold text-lg mb-2">
-              {fixture.home_team} vs {fixture.away_team}
-            </h2>
-            <p className="text-sm mb-2 text-gray-500">
-              {matchDate.toLocaleString()}
-            </p>
+      <ul className="mb-6">
+        {week.map(f => (
+          <li key={f.id} className="mb-4 border p-3 rounded">
+            <div className="font-bold">{f.home_team} vs {f.away_team}</div>
+            <div className="text-sm text-gray-600">{new Date(f.match_date).toLocaleString()}</div>
+            <div className="flex items-center gap-2 mt-2">
+              <input
+                type="number"
+                placeholder="Home"
+                value={predictions[f.id]?.home || ''}
+                onChange={e => handlePredictionChange(f.id, 'home', e.target.value)}
+                className="border p-1 w-16"
+              />
+              <span>-</span>
+              <input
+                type="number"
+                placeholder="Away"
+                value={predictions[f.id]?.away || ''}
+                onChange={e => handlePredictionChange(f.id, 'away', e.target.value)}
+                className="border p-1 w-16"
+              />
+              <label className="ml-4 flex items-center space-x-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={!!bonusPicks[f.id]}
+                  onChange={() => toggleBonus(f.id)}
+                />
+                <span>Bonus</span>
+              </label>
+            </div>
+          </li>
+        ))}
+      </ul>
 
-            {saved && (
-              <p className="text-sm text-green-600 mb-2">
-                Saved: {saved.predicted_home_score} - {saved.predicted_away_score}
-                {saved.is_bonus ? ' ⭐ (Bonus)' : ''}
-              </p>
-            )}
-
-            {locked ? (
-              <p className="text-red-600 font-bold">Predictions are locked</p>
-            ) : (
-              <>
-                <div className="flex space-x-2 mb-2">
-                  <input
-                    type="number"
-                    placeholder="Home score"
-                    className="border p-2 w-24"
-                    onChange={e => handleInput(fixture.id, 'home', e.target.value)}
-                    value={current.home || ''}
-                  />
-                  <input
-                    type="number"
-                    placeholder="Away score"
-                    className="border p-2 w-24"
-                    onChange={e => handleInput(fixture.id, 'away', e.target.value)}
-                    value={current.away || ''}
-                  />
-                  <label className="flex items-center space-x-1">
-                    <input
-                      type="checkbox"
-                      checked={current.is_bonus || false}
-                      onChange={() => handleBonusToggle(fixture.id)}
-                    />
-                    <span>Bonus</span>
-                  </label>
-                </div>
-                <button
-                  className="bg-blue-600 text-white px-4 py-2 rounded"
-                  onClick={() => handleSubmit(fixture.id)}
-                >
-                  Submit Prediction
-                </button>
-              </>
-            )}
-          </div>
-        );
-      })}
+      <button
+        onClick={savePredictions}
+        className="bg-blue-600 text-white px-4 py-2 rounded"
+      >
+        Save Predictions
+      </button>
     </div>
   );
-}
+            }
