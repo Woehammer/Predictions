@@ -56,7 +56,7 @@ export default function Leagues() {
     const invite_code = uuidv4().split('-')[0];
     const { data, error } = await supabase.from('leagues').insert({
       name: newLeagueName,
-      created_by: user.id,
+      creator_id: user.id,
       invite_code,
     }).select();
 
