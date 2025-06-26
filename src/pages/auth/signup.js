@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
-import { supabase } from '../../lib/supabaseclient';
+import { supabase } from '../../lib/supabaseClient';
 // import Header from '../../components/Header'; // optional
 
 export default function Signup() {
