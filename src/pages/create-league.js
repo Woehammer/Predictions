@@ -24,7 +24,7 @@ export default function CreateLeague() {
 
     const { data, error } = await supabase
       .from('leagues')
-      .insert([{ name, is_public: isPublic, invite_code: code, owner_id: user.id }])
+      .insert([{ name, is_public: isPublic, invite_code: code, creator_id: user.id }])
       .select()
       .single();
 
