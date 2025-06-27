@@ -6,11 +6,23 @@ export default function UserDashboard({ user }) { const [points, setPoints] = us
 
 useEffect(() => { if (!user) return;
 
-const fetchData = async () => {
-  const { data: userLeagues, error: leaguesError } = await supabase
-    .from('league_members')
-    .select('league_id')
-    .eq('user_id', user.id);
+const { data: memberships, error: memberError } = await supabase
+  .from('league_members')
+  .select('league_id')
+  .eq('user_id', user.id);
+
+if (memberError) console.error('League member error:', memberError);
+
+const leagueIds = memberships.map(m => m.league_id);
+
+const { data: userLeagues, error: leaguesError } = await supabase
+  .from('leagues')
+  .select('id, name, is_public, invite_code')
+  .in('id', leagueIds);
+
+if (leaguesError) console.error('Leagues fetch error:', leaguesError);
+
+setLeagues(userLeagues || []);
 
   if (leaguesError) {
     console.error('Failed to fetch league memberships:', leaguesError);
