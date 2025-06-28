@@ -5,17 +5,16 @@ import dayjs from 'dayjs';
 
 export default function PredictionsPage() {
   const user = useUser();
-  const [fixtures, setFixtures] = useState([]);
   const [gameWeeks, setGameWeeks] = useState([]);
   const [selectedWeekIndex, setSelectedWeekIndex] = useState(0);
   const [predictions, setPredictions] = useState({});
   const [bonusPicks, setBonusPicks] = useState({});
 
   useEffect(() => {
-    if (user) fetchFixtures();
+    if (user) fetchAllData();
   }, [user]);
 
-  const fetchFixtures = async () => {
+  const fetchAllData = async () => {
     const { data: fixturesData } = await supabase
       .from('fixtures')
       .select('*')
@@ -33,7 +32,7 @@ export default function PredictionsPage() {
       predMap[p.fixture_id] = {
         home: p.predicted_home_score,
         away: p.predicted_away_score,
-        points: p.points,
+        points: p.points ?? null,
       };
       if (p.is_bonus) bonusMap[p.fixture_id] = true;
     });
@@ -109,8 +108,8 @@ export default function PredictionsPage() {
       if (error) console.error('Prediction error:', error);
     }
 
-    // Refresh points after save
-    await fetchFixtures();
+    // Refresh predictions after saving
+    await fetchAllData();
   };
 
   const week = gameWeeks[selectedWeekIndex] || [];
@@ -165,7 +164,7 @@ export default function PredictionsPage() {
                 />
                 <span>Bonus</span>
               </label>
-              {predictions[f.id]?.points !== undefined && (
+              {predictions[f.id]?.points !== null && (
                 <span className="ml-2 text-green-600 text-sm font-semibold">
                   {predictions[f.id].points} pts
                 </span>
@@ -183,4 +182,4 @@ export default function PredictionsPage() {
       </button>
     </div>
   );
-  }
+        }
