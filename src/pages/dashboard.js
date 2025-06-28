@@ -1,3 +1,5 @@
+// pages/dashboard.js
+
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseclient';
 import Link from 'next/link';
@@ -16,73 +18,78 @@ export default function UserDashboard({ user }) {
 
   useEffect(() => {
     if (!user) return;
-
-    const fetchData = async () => {
-      const { data: memberships, error: memberError } = await supabase
-        .from('league_members')
-        .select('league_id')
-        .eq('user_id', user.id);
-
-      if (memberError) {
-        console.error('Error fetching memberships:', memberError);
-        return;
-      }
-
-      const leagueIds = memberships.map(m => m.league_id);
-
-      let userLeagues = [];
-      if (leagueIds.length > 0) {
-        const { data: leaguesData, error: leaguesError } = await supabase
-          .from('leagues')
-          .select('id, name, is_public, invite_code')
-          .in('id', leagueIds);
-
-        if (leaguesError) {
-          console.error('Error fetching leagues:', leaguesError);
-        } else {
-          userLeagues = leaguesData;
-        }
-      }
-
-      setLeagues(userLeagues);
-
-      const { data: pointsData } = await supabase
-        .from('user_points')
-        .select('total_points')
-        .eq('user_id', user.id)
-        .single();
-
-      setPoints(pointsData?.total_points || 0);
-
-      const { data: publicData } = await supabase
-        .from('leagues')
-        .select()
-        .eq('is_public', true);
-
-      setPublicLeagues(publicData || []);
-
-      const { data: results } = await supabase
-        .from('predictions')
-        .select('fixtures(home_team, away_team, actual_home_score, actual_away_score), predicted_home_score, predicted_away_score')
-        .eq('user_id', user.id)
-        .not('fixtures.actual_home_score', 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      setRecentResults(results || []);
-
-      const { data: fixtures } = await supabase
-        .from('fixtures')
-        .select()
-        .gt('match_date', new Date().toISOString())
-        .order('match_date')
-        .limit(5);
-
-      setUpcomingFixtures(fixtures || []);
-    };
-
-    fetchData();
+    fetchUserLeagues();
+    fetchOtherData();
   }, [user]);
+
+  const fetchUserLeagues = async () => {
+    const { data: memberships, error: memberError } = await supabase
+      .from('league_members')
+      .select('league_id')
+      .eq('user_id', user.id);
+
+    if (memberError) {
+      console.error('League member error:', memberError);
+      setLeagues([]);
+      return;
+    }
+
+    const leagueIds = memberships.map(m => m.league_id);
+
+    if (leagueIds.length === 0) {
+      setLeagues([]);
+      return;
+    }
+
+    const { data: leaguesData, error: leaguesError } = await supabase
+      .from('leagues')
+      .select('id, name, is_public, invite_code')
+      .in('id', leagueIds);
+
+    if (leaguesError) {
+      console.error('Leagues fetch error:', leaguesError);
+      setLeagues([]);
+      return;
+    }
+
+    setLeagues(leaguesData || []);
+  };
+
+  const fetchOtherData = async () => {
+    const { data: pointsData } = await supabase
+      .from('user_points')
+      .select('total_points')
+      .eq('user_id', user.id)
+      .single();
+
+    setPoints(pointsData?.total_points || 0);
+
+    const { data: publicData } = await supabase
+      .from('leagues')
+      .select()
+      .eq('is_public', true);
+
+    setPublicLeagues(publicData || []);
+
+    const { data: results } = await supabase
+      .from('predictions')
+      .select('fixtures(home_team, away_team, actual_home_score, actual_away_score), predicted_home_score, predicted_away_score')
+      .eq('user_id', user.id)
+      .not('fixtures.actual_home_score', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    setRecentResults(results || []);
+
+    const { data: fixtures } = await supabase
+      .from('fixtures')
+      .select()
+      .gt('match_date', new Date().toISOString())
+      .order('match_date')
+      .limit(5);
+
+    setUpcomingFixtures(fixtures || []);
+  };
 
   const joinLeague = async () => {
     await supabase.rpc('join_league_by_code', {
@@ -90,6 +97,7 @@ export default function UserDashboard({ user }) {
       invite_code_input: inviteCode,
     });
     setInviteCode('');
+    fetchUserLeagues();
   };
 
   const leaveLeague = async (leagueId) => {
@@ -111,7 +119,7 @@ export default function UserDashboard({ user }) {
 
     const code = isPublic ? null : Math.random().toString(36).substr(2, 8).toUpperCase();
 
-    const { data, error } = await supabase
+    const { data: leagueData, error: leagueError } = await supabase
       .from('leagues')
       .insert([
         {
@@ -124,28 +132,26 @@ export default function UserDashboard({ user }) {
       .select()
       .single();
 
-    if (error) {
+    if (leagueError) {
       setError('Failed to create league.');
-      console.error(error);
+      console.error('Create league error:', leagueError);
       return;
     }
 
-    const newLeague = data;
-
     const { error: memberError } = await supabase
       .from('league_members')
-      .insert([{ league_id: newLeague.id, user_id: user.id }]);
+      .insert([{ league_id: leagueData.id, user_id: user.id }]);
 
     if (memberError) {
       setError('League created, but failed to join.');
-      console.error(memberError);
+      console.error('Join league error:', memberError);
       return;
     }
 
     setNewLeagueName('');
     setIsPublic(false);
-    setSuccessMessage(`League "${newLeague.name}" created! ${code ? 'Invite code: ' + code : ''}`);
-    setLeagues(prev => [...prev, newLeague]);
+    setSuccessMessage(`League "${leagueData.name}" created! ${code ? 'Invite code: ' + code : ''}`);
+    fetchUserLeagues();
   };
 
   return (
@@ -179,16 +185,16 @@ export default function UserDashboard({ user }) {
         <button onClick={joinLeague} className="bg-blue-500 text-white px-4 py-1 rounded">Join</button>
       </div>
 
-      <div className="mb-6 border p-4 rounded bg-white dark:bg-gray-800">
+      <div className="mb-6 border p-4 rounded bg-gray-800 text-white">
         <h3 className="text-lg font-semibold mb-2">Create New League</h3>
-        {successMessage && <p className="text-green-600 mb-2">{successMessage}</p>}
-        {error && <p className="text-red-600 mb-2">{error}</p>}
+        {successMessage && <p className="text-green-400 mb-2">{successMessage}</p>}
+        {error && <p className="text-red-400 mb-2">{error}</p>}
         <input
           type="text"
           value={newLeagueName}
           onChange={e => setNewLeagueName(e.target.value)}
           placeholder="League name"
-          className="border px-2 py-1 w-full mb-2"
+          className="border px-2 py-1 w-full mb-2 text-black"
         />
         <label className="flex items-center space-x-2 mb-2">
           <input
@@ -238,4 +244,4 @@ export default function UserDashboard({ user }) {
       </Link>
     </div>
   );
-      }
+        }
