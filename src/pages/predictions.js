@@ -1,3 +1,5 @@
+// pages/predictions.js
+
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseclient';
 import { useUser } from '@supabase/auth-helpers-react';
@@ -5,20 +7,18 @@ import dayjs from 'dayjs';
 
 export default function PredictionsPage() {
   const user = useUser();
+  const [fixtures, setFixtures] = useState([]);
   const [gameWeeks, setGameWeeks] = useState([]);
   const [selectedWeekIndex, setSelectedWeekIndex] = useState(0);
   const [predictions, setPredictions] = useState({});
   const [bonusPicks, setBonusPicks] = useState({});
-  const [loading, setLoading] = useState(true);
+  const [userPoints, setUserPoints] = useState({});
 
   useEffect(() => {
-    if (user?.id) {
-      fetchFixtures();
-    }
+    if (user) fetchFixtures();
   }, [user]);
 
   const fetchFixtures = async () => {
-    setLoading(true);
     const { data: fixturesData, error } = await supabase
       .from('fixtures')
       .select('*')
@@ -26,39 +26,34 @@ export default function PredictionsPage() {
 
     if (error) {
       console.error('Error fetching fixtures:', error);
-      setLoading(false);
       return;
     }
 
     const grouped = groupFixturesByWeek(fixturesData);
     setGameWeeks(grouped);
 
-    // Optionally pre-fill predictions from DB
-    const { data: existingPreds, error: predsError } = await supabase
+    // Also fetch user's existing predictions
+    const { data: existingPredictions } = await supabase
       .from('predictions')
       .select('*')
       .eq('user_id', user.id);
 
-    if (predsError) {
-      console.error('Error fetching predictions:', predsError);
-      setLoading(false);
-      return;
-    }
+    const predObj = {};
+    const bonusObj = {};
 
-    const predsMap = {};
-    const bonusMap = {};
-    existingPreds.forEach(pred => {
-      predsMap[pred.fixture_id] = {
-        home: pred.predicted_home_score,
-        away: pred.predicted_away_score,
-        points_awarded: pred.points_awarded || null,
+    existingPredictions.forEach(p => {
+      predObj[p.fixture_id] = {
+        home: p.predicted_home_score,
+        away: p.predicted_away_score,
+        points: p.points_awarded || 0,
       };
-      bonusMap[pred.fixture_id] = pred.is_bonus;
+      if (p.is_bonus) {
+        bonusObj[p.fixture_id] = true;
+      }
     });
 
-    setPredictions(predsMap);
-    setBonusPicks(bonusMap);
-    setLoading(false);
+    setPredictions(predObj);
+    setBonusPicks(bonusObj);
   };
 
   const groupFixturesByWeek = (fixtures) => {
@@ -87,7 +82,7 @@ export default function PredictionsPage() {
       ...prev,
       [fixtureId]: {
         ...prev[fixtureId],
-        [field]: value !== '' ? parseInt(value, 10) : '',
+        [field]: value,
       },
     }));
   };
@@ -110,29 +105,25 @@ export default function PredictionsPage() {
 
     for (const fixture of weekFixtures) {
       const prediction = predictions[fixture.id];
-      if (!prediction || prediction.home === '' || prediction.away === '') continue;
+      if (!prediction) continue;
 
       const { error } = await supabase
         .from('predictions')
         .upsert({
           fixture_id: fixture.id,
           user_id: user.id,
-          predicted_home_score: parseInt(prediction.home, 10),
-          predicted_away_score: parseInt(prediction.away, 10),
+          predicted_home_score: prediction.home,
+          predicted_away_score: prediction.away,
           is_bonus: !!bonusPicks[fixture.id],
         });
 
-      if (error) console.error('Prediction save error:', error);
+      if (error) console.error('Prediction error:', error);
     }
 
-    await fetchFixtures();
+    fetchFixtures(); // Refresh predictions to show updated points
   };
 
   const week = gameWeeks[selectedWeekIndex] || [];
-
-  if (loading) {
-    return <div className="p-4 text-center">Loading fixtures...</div>;
-  }
 
   return (
     <div className="p-4 max-w-3xl mx-auto">
@@ -164,7 +155,7 @@ export default function PredictionsPage() {
               <input
                 type="number"
                 placeholder="Home"
-                value={predictions[f.id]?.home ?? ''}
+                value={predictions[f.id]?.home || ''}
                 onChange={e => handlePredictionChange(f.id, 'home', e.target.value)}
                 className="border p-1 w-16"
               />
@@ -172,7 +163,7 @@ export default function PredictionsPage() {
               <input
                 type="number"
                 placeholder="Away"
-                value={predictions[f.id]?.away ?? ''}
+                value={predictions[f.id]?.away || ''}
                 onChange={e => handlePredictionChange(f.id, 'away', e.target.value)}
                 className="border p-1 w-16"
               />
@@ -184,10 +175,12 @@ export default function PredictionsPage() {
                 />
                 <span>Bonus</span>
               </label>
+              {predictions[f.id]?.points > 0 && (
+                <span className="ml-2 text-green-600 text-sm font-medium">
+                  {predictions[f.id].points} pts
+                </span>
+              )}
             </div>
-            {predictions[f.id]?.points_awarded !== null && predictions[f.id]?.points_awarded !== undefined && (
-              <div className="text-green-600 text-sm mt-1">Points: {predictions[f.id].points_awarded}</div>
-            )}
           </li>
         ))}
       </ul>
@@ -200,4 +193,4 @@ export default function PredictionsPage() {
       </button>
     </div>
   );
-  }
+    }
