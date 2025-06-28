@@ -3,8 +3,10 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseclient';
 import Link from 'next/link';
+import { useUser } from '@supabase/auth-helpers-react';
 
-export default function UserDashboard({ user }) {
+export default function UserDashboard() {
+  const user = useUser();
   const [points, setPoints] = useState(0);
   const [leagues, setLeagues] = useState([]);
   const [publicLeagues, setPublicLeagues] = useState([]);
@@ -19,76 +21,81 @@ export default function UserDashboard({ user }) {
   useEffect(() => {
     if (!user) return;
     fetchUserLeagues();
-    fetchOtherData();
   }, [user]);
 
   const fetchUserLeagues = async () => {
-    const { data: memberships, error: memberError } = await supabase
-      .from('league_members')
-      .select('league_id')
-      .eq('user_id', user.id);
+    setError('');
+    try {
+      // Fetch league memberships
+      const { data: memberships, error: memberError } = await supabase
+        .from('league_members')
+        .select('league_id')
+        .eq('user_id', user.id);
 
-    if (memberError) {
-      console.error('League member error:', memberError);
-      setLeagues([]);
-      return;
+      if (memberError) {
+        console.error('League member error:', memberError);
+        setError('Failed to fetch league memberships');
+        return;
+      }
+
+      const leagueIds = memberships.map(m => m.league_id);
+
+      // Fetch league details
+      const { data: userLeagues, error: leaguesError } = await supabase
+        .from('leagues')
+        .select('id, name, is_public, invite_code')
+        .in('id', leagueIds);
+
+      if (leaguesError) {
+        console.error('Leagues fetch error:', leaguesError);
+        setError('Failed to fetch leagues');
+        return;
+      }
+
+      setLeagues(userLeagues || []);
+
+      // Fetch user points
+      const { data: pointsData } = await supabase
+        .from('user_points')
+        .select('total_points')
+        .eq('user_id', user.id)
+        .single();
+
+      setPoints(pointsData?.total_points || 0);
+
+      // Fetch public leagues
+      const { data: publicData } = await supabase
+        .from('leagues')
+        .select()
+        .eq('is_public', true);
+
+      setPublicLeagues(publicData || []);
+
+      // Fetch recent results
+      const { data: results } = await supabase
+        .from('predictions')
+        .select('fixtures(home_team, away_team, actual_home_score, actual_away_score), predicted_home_score, predicted_away_score')
+        .eq('user_id', user.id)
+        .not('fixtures.actual_home_score', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      setRecentResults(results || []);
+
+      // Fetch upcoming fixtures
+      const { data: fixtures } = await supabase
+        .from('fixtures')
+        .select()
+        .gt('match_date', new Date().toISOString())
+        .order('match_date')
+        .limit(5);
+
+      setUpcomingFixtures(fixtures || []);
+
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      setError('Unexpected error occurred');
     }
-
-    const leagueIds = memberships.map(m => m.league_id);
-
-    if (leagueIds.length === 0) {
-      setLeagues([]);
-      return;
-    }
-
-    const { data: leaguesData, error: leaguesError } = await supabase
-      .from('leagues')
-      .select('id, name, is_public, invite_code')
-      .in('id', leagueIds);
-
-    if (leaguesError) {
-      console.error('Leagues fetch error:', leaguesError);
-      setLeagues([]);
-      return;
-    }
-
-    setLeagues(leaguesData || []);
-  };
-
-  const fetchOtherData = async () => {
-    const { data: pointsData } = await supabase
-      .from('user_points')
-      .select('total_points')
-      .eq('user_id', user.id)
-      .single();
-
-    setPoints(pointsData?.total_points || 0);
-
-    const { data: publicData } = await supabase
-      .from('leagues')
-      .select()
-      .eq('is_public', true);
-
-    setPublicLeagues(publicData || []);
-
-    const { data: results } = await supabase
-      .from('predictions')
-      .select('fixtures(home_team, away_team, actual_home_score, actual_away_score), predicted_home_score, predicted_away_score')
-      .eq('user_id', user.id)
-      .not('fixtures.actual_home_score', 'is', null)
-      .order('created_at', { ascending: false })
-      .limit(5);
-
-    setRecentResults(results || []);
-
-    const { data: fixtures } = await supabase
-      .from('fixtures')
-      .select()
-      .gt('match_date', new Date().toISOString())
-      .order('match_date')
-      .limit(5);
-
-    setUpcomingFixtures(fixtures || []);
   };
 
   const joinLeague = async () => {
@@ -106,12 +113,13 @@ export default function UserDashboard({ user }) {
       .delete()
       .match({ user_id: user.id, league_id: leagueId });
 
-    setLeagues(leagues.filter(l => l.id !== leagueId));
+    fetchUserLeagues();
   };
 
   const createLeague = async () => {
     setError('');
     setSuccessMessage('');
+
     if (!newLeagueName.trim()) {
       setError('Please enter a league name.');
       return;
@@ -133,8 +141,8 @@ export default function UserDashboard({ user }) {
       .single();
 
     if (leagueError) {
-      setError('Failed to create league.');
-      console.error('Create league error:', leagueError);
+      console.error('League creation error:', leagueError);
+      setError('Failed to create league: ' + leagueError.message);
       return;
     }
 
@@ -143,8 +151,8 @@ export default function UserDashboard({ user }) {
       .insert([{ league_id: leagueData.id, user_id: user.id }]);
 
     if (memberError) {
-      setError('League created, but failed to join.');
-      console.error('Join league error:', memberError);
+      console.error('League member join error:', memberError);
+      setError('League created, but failed to join: ' + memberError.message);
       return;
     }
 
@@ -156,7 +164,8 @@ export default function UserDashboard({ user }) {
 
   return (
     <div className="p-4 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Welcome!</h1>
+      <h1 className="text-2xl font-bold mb-1">Welcome!</h1>
+      <p className="mb-2 text-xs text-gray-400">User ID: {user?.id}</p>
       <p className="mb-4">Total Points: <strong>{points}</strong></p>
 
       <h2 className="text-xl font-semibold mt-6 mb-2">Your Leagues</h2>
@@ -244,4 +253,4 @@ export default function UserDashboard({ user }) {
       </Link>
     </div>
   );
-        }
+            }
