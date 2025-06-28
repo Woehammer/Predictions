@@ -1,5 +1,3 @@
-// pages/predictions.js
-
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseclient';
 import { useUser } from '@supabase/auth-helpers-react';
@@ -12,48 +10,43 @@ export default function PredictionsPage() {
   const [selectedWeekIndex, setSelectedWeekIndex] = useState(0);
   const [predictions, setPredictions] = useState({});
   const [bonusPicks, setBonusPicks] = useState({});
-  const [userPoints, setUserPoints] = useState({});
+  const [predictionPoints, setPredictionPoints] = useState({});
 
   useEffect(() => {
     if (user) fetchFixtures();
   }, [user]);
 
   const fetchFixtures = async () => {
-    const { data: fixturesData, error } = await supabase
+    const { data: fixturesData } = await supabase
       .from('fixtures')
       .select('*')
       .order('match_date');
 
-    if (error) {
-      console.error('Error fetching fixtures:', error);
-      return;
-    }
-
     const grouped = groupFixturesByWeek(fixturesData);
     setGameWeeks(grouped);
 
-    // Also fetch user's existing predictions
-    const { data: existingPredictions } = await supabase
+    // Fetch existing predictions for user
+    const { data: userPreds } = await supabase
       .from('predictions')
       .select('*')
       .eq('user_id', user.id);
 
-    const predObj = {};
-    const bonusObj = {};
+    const predMap = {};
+    const bonusMap = {};
+    const pointsMap = {};
 
-    existingPredictions.forEach(p => {
-      predObj[p.fixture_id] = {
-        home: p.predicted_home_score,
-        away: p.predicted_away_score,
-        points: p.points_awarded || 0,
+    userPreds.forEach(pred => {
+      predMap[pred.fixture_id] = {
+        home: pred.predicted_home_score,
+        away: pred.predicted_away_score,
       };
-      if (p.is_bonus) {
-        bonusObj[p.fixture_id] = true;
-      }
+      bonusMap[pred.fixture_id] = pred.is_bonus;
+      pointsMap[pred.fixture_id] = pred.points || 0;
     });
 
-    setPredictions(predObj);
-    setBonusPicks(bonusObj);
+    setPredictions(predMap);
+    setBonusPicks(bonusMap);
+    setPredictionPoints(pointsMap);
   };
 
   const groupFixturesByWeek = (fixtures) => {
@@ -120,7 +113,8 @@ export default function PredictionsPage() {
       if (error) console.error('Prediction error:', error);
     }
 
-    fetchFixtures(); // Refresh predictions to show updated points
+    // Refresh after save
+    fetchFixtures();
   };
 
   const week = gameWeeks[selectedWeekIndex] || [];
@@ -175,12 +169,13 @@ export default function PredictionsPage() {
                 />
                 <span>Bonus</span>
               </label>
-              {predictions[f.id]?.points > 0 && (
-                <span className="ml-2 text-green-600 text-sm font-medium">
-                  {predictions[f.id].points} pts
-                </span>
-              )}
             </div>
+
+            {predictionPoints[f.id] !== undefined && (
+              <div className="text-green-600 text-sm mt-1">
+                Points earned: {predictionPoints[f.id]}
+              </div>
+            )}
           </li>
         ))}
       </ul>
