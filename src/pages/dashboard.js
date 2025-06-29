@@ -3,10 +3,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseclient';
 import Link from 'next/link';
-import { useUser } from '@supabase/auth-helpers-react';
 
-export default function UserDashboard() {
-  const user = useUser();
+export default function UserDashboard({ user }) {
   const [points, setPoints] = useState(0);
   const [leagues, setLeagues] = useState([]);
   const [publicLeagues, setPublicLeagues] = useState([]);
@@ -20,13 +18,8 @@ export default function UserDashboard() {
 
   useEffect(() => {
     if (!user) return;
-    fetchUserLeagues();
-  }, [user]);
 
-  const fetchUserLeagues = async () => {
-    setError('');
-    try {
-      // Fetch league memberships
+    const fetchData = async () => {
       const { data: memberships, error: memberError } = await supabase
         .from('league_members')
         .select('league_id')
@@ -34,27 +27,19 @@ export default function UserDashboard() {
 
       if (memberError) {
         console.error('League member error:', memberError);
-        setError('Failed to fetch league memberships');
         return;
       }
 
       const leagueIds = memberships.map(m => m.league_id);
 
-      // Fetch league details
       const { data: userLeagues, error: leaguesError } = await supabase
         .from('leagues')
         .select('id, name, is_public, invite_code')
         .in('id', leagueIds);
 
-      if (leaguesError) {
-        console.error('Leagues fetch error:', leaguesError);
-        setError('Failed to fetch leagues');
-        return;
-      }
-
+      if (leaguesError) console.error('Leagues fetch error:', leaguesError);
       setLeagues(userLeagues || []);
 
-      // Fetch user points
       const { data: pointsData } = await supabase
         .from('user_points')
         .select('total_points')
@@ -63,7 +48,6 @@ export default function UserDashboard() {
 
       setPoints(pointsData?.total_points || 0);
 
-      // Fetch public leagues
       const { data: publicData } = await supabase
         .from('leagues')
         .select()
@@ -71,7 +55,6 @@ export default function UserDashboard() {
 
       setPublicLeagues(publicData || []);
 
-      // Fetch recent results
       const { data: results } = await supabase
         .from('predictions')
         .select('fixtures(home_team, away_team, actual_home_score, actual_away_score), predicted_home_score, predicted_away_score')
@@ -82,7 +65,6 @@ export default function UserDashboard() {
 
       setRecentResults(results || []);
 
-      // Fetch upcoming fixtures
       const { data: fixtures } = await supabase
         .from('fixtures')
         .select()
@@ -91,12 +73,10 @@ export default function UserDashboard() {
         .limit(5);
 
       setUpcomingFixtures(fixtures || []);
+    };
 
-    } catch (err) {
-      console.error('Unexpected error:', err);
-      setError('Unexpected error occurred');
-    }
-  };
+    fetchData();
+  }, [user]);
 
   const joinLeague = async () => {
     await supabase.rpc('join_league_by_code', {
@@ -104,7 +84,6 @@ export default function UserDashboard() {
       invite_code_input: inviteCode,
     });
     setInviteCode('');
-    fetchUserLeagues();
   };
 
   const leaveLeague = async (leagueId) => {
@@ -113,13 +92,12 @@ export default function UserDashboard() {
       .delete()
       .match({ user_id: user.id, league_id: leagueId });
 
-    fetchUserLeagues();
+    setLeagues(leagues.filter(l => l.id !== leagueId));
   };
 
   const createLeague = async () => {
     setError('');
     setSuccessMessage('');
-
     if (!newLeagueName.trim()) {
       setError('Please enter a league name.');
       return;
@@ -127,7 +105,7 @@ export default function UserDashboard() {
 
     const code = isPublic ? null : Math.random().toString(36).substr(2, 8).toUpperCase();
 
-    const { data: leagueData, error: leagueError } = await supabase
+    const { data, error } = await supabase
       .from('leagues')
       .insert([
         {
@@ -140,26 +118,28 @@ export default function UserDashboard() {
       .select()
       .single();
 
-    if (leagueError) {
-      console.error('League creation error:', leagueError);
-      setError('Failed to create league: ' + leagueError.message);
+    if (error) {
+      setError('Failed to create league.');
+      console.error(error);
       return;
     }
 
+    const newLeague = data;
+
     const { error: memberError } = await supabase
       .from('league_members')
-      .insert([{ league_id: leagueData.id, user_id: user.id }]);
+      .insert([{ league_id: newLeague.id, user_id: user.id }]);
 
     if (memberError) {
-      console.error('League member join error:', memberError);
-      setError('League created, but failed to join: ' + memberError.message);
+      setError('League created, but failed to join.');
+      console.error(memberError);
       return;
     }
 
     setNewLeagueName('');
     setIsPublic(false);
-    setSuccessMessage(`League "${leagueData.name}" created! ${code ? 'Invite code: ' + code : ''}`);
-    fetchUserLeagues();
+    setSuccessMessage(`League "${newLeague.name}" created! ${code ? 'Invite code: ' + code : ''}`);
+    setLeagues(prev => [...prev, newLeague]);
   };
 
   return (
@@ -194,16 +174,16 @@ export default function UserDashboard() {
         <button onClick={joinLeague} className="bg-blue-500 text-white px-4 py-1 rounded">Join</button>
       </div>
 
-      <div className="mb-6 border p-4 rounded bg-gray-800 text-white">
+      <div className="mb-6 border p-4 rounded bg-gray-100 dark:bg-gray-800">
         <h3 className="text-lg font-semibold mb-2">Create New League</h3>
-        {successMessage && <p className="text-green-400 mb-2">{successMessage}</p>}
-        {error && <p className="text-red-400 mb-2">{error}</p>}
+        {successMessage && <p className="text-green-600 mb-2">{successMessage}</p>}
+        {error && <p className="text-red-600 mb-2">{error}</p>}
         <input
           type="text"
           value={newLeagueName}
           onChange={e => setNewLeagueName(e.target.value)}
           placeholder="League name"
-          className="border px-2 py-1 w-full mb-2 text-black"
+          className="border px-2 py-1 w-full mb-2"
         />
         <label className="flex items-center space-x-2 mb-2">
           <input
@@ -253,4 +233,4 @@ export default function UserDashboard() {
       </Link>
     </div>
   );
-            }
+              }
