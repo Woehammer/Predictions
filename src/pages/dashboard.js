@@ -1,10 +1,12 @@
-// pages/dashboard.js
-
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseclient';
 import Link from 'next/link';
+import { useSession } from '@supabase/auth-helpers-react';
 
-export default function UserDashboard({ user }) {
+export default function UserDashboard() {
+  const session = useSession();
+  const user = session?.user;
+
   const [points, setPoints] = useState(0);
   const [leagues, setLeagues] = useState([]);
   const [publicLeagues, setPublicLeagues] = useState([]);
@@ -25,12 +27,9 @@ export default function UserDashboard({ user }) {
         .select('league_id')
         .eq('user_id', user.id);
 
-      if (memberError) {
-        console.error('League member error:', memberError);
-        return;
-      }
+      if (memberError) console.error('League member error:', memberError);
 
-      const leagueIds = memberships.map(m => m.league_id);
+      const leagueIds = memberships?.map(m => m.league_id) || [];
 
       const { data: userLeagues, error: leaguesError } = await supabase
         .from('leagues')
@@ -38,6 +37,7 @@ export default function UserDashboard({ user }) {
         .in('id', leagueIds);
 
       if (leaguesError) console.error('Leagues fetch error:', leaguesError);
+
       setLeagues(userLeagues || []);
 
       const { data: pointsData } = await supabase
@@ -142,10 +142,12 @@ export default function UserDashboard({ user }) {
     setLeagues(prev => [...prev, newLeague]);
   };
 
+  if (!user) return <p className="p-4">Loading...</p>;
+
   return (
     <div className="p-4 max-w-3xl mx-auto">
       <h1 className="text-2xl font-bold mb-1">Welcome!</h1>
-      <p className="mb-2 text-xs text-gray-400">User ID: {user?.id}</p>
+      <p className="mb-2 text-xs text-gray-400">User ID: {user.id}</p>
       <p className="mb-4">Total Points: <strong>{points}</strong></p>
 
       <h2 className="text-xl font-semibold mt-6 mb-2">Your Leagues</h2>
@@ -183,7 +185,7 @@ export default function UserDashboard({ user }) {
           value={newLeagueName}
           onChange={e => setNewLeagueName(e.target.value)}
           placeholder="League name"
-          className="border px-2 py-1 w-full mb-2"
+          className="border px-2 py-1 w-full mb-2 text-black"
         />
         <label className="flex items-center space-x-2 mb-2">
           <input
@@ -233,4 +235,4 @@ export default function UserDashboard({ user }) {
       </Link>
     </div>
   );
-    }
+  }
