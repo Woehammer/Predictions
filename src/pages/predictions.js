@@ -5,45 +5,45 @@ import dayjs from 'dayjs';
 
 export default function PredictionsPage() {
   const user = useUser();
+  const [fixtures, setFixtures] = useState([]);
   const [gameWeeks, setGameWeeks] = useState([]);
   const [selectedWeekIndex, setSelectedWeekIndex] = useState(0);
   const [predictions, setPredictions] = useState({});
   const [bonusPicks, setBonusPicks] = useState({});
+  const [scores, setScores] = useState({});
 
   useEffect(() => {
-    if (user) {
-      fetchData();
-    }
+    if (user) fetchFixtures();
   }, [user]);
 
-  const fetchData = async () => {
+  const fetchFixtures = async () => {
     const { data: fixturesData } = await supabase
       .from('fixtures')
       .select('*')
       .order('match_date');
 
-    const { data: predictionsData } = await supabase
+    const { data: userPredictions } = await supabase
       .from('predictions')
       .select('*')
       .eq('user_id', user.id);
 
-    const predMap = {};
-    const bonusMap = {};
+    const predictionsMap = {};
+    const bonusesMap = {};
 
-    predictionsData?.forEach(p => {
-      predMap[p.fixture_id] = {
-        home: p.predicted_home_score,
-        away: p.predicted_away_score,
-        points: p.points ?? null,
+    userPredictions?.forEach(pred => {
+      predictionsMap[pred.fixture_id] = {
+        home: pred.predicted_home_score,
+        away: pred.predicted_away_score,
       };
-      if (p.is_bonus) bonusMap[p.fixture_id] = true;
+      bonusesMap[pred.fixture_id] = pred.is_bonus;
     });
 
-    setPredictions(predMap);
-    setBonusPicks(bonusMap);
+    setPredictions(predictionsMap);
+    setBonusPicks(bonusesMap);
 
     const grouped = groupFixturesByWeek(fixturesData);
     setGameWeeks(grouped);
+    setFixtures(fixturesData);
   };
 
   const groupFixturesByWeek = (fixtures) => {
@@ -91,7 +91,7 @@ export default function PredictionsPage() {
   };
 
   const savePredictions = async () => {
-    const weekFixtures = gameWeeks[selectedWeekIndex];
+    const weekFixtures = gameWeeks[selectedWeekIndex] || [];
 
     for (const fixture of weekFixtures) {
       const prediction = predictions[fixture.id];
@@ -110,11 +110,11 @@ export default function PredictionsPage() {
       if (error) console.error('Prediction error:', error);
     }
 
-    // ✅ Refresh after save
-    await fetchData();
+    // Refresh data to reflect saved predictions
+    fetchFixtures();
   };
 
-  const week = gameWeeks[selectedWeekIndex] || [];
+  const week = gameWeeks[selectedWeekIndex] ? gameWeeks[selectedWeekIndex] : [];
 
   return (
     <div className="p-4 max-w-3xl mx-auto">
@@ -124,14 +124,14 @@ export default function PredictionsPage() {
         <button
           onClick={() => setSelectedWeekIndex(i => Math.max(i - 1, 0))}
           disabled={selectedWeekIndex === 0}
-          className="bg-gray-300 px-3 py-1 rounded"
+          className="bg-gray-300 px-3 py-1 rounded disabled:opacity-50"
         >
           Previous
         </button>
         <button
           onClick={() => setSelectedWeekIndex(i => Math.min(i + 1, gameWeeks.length - 1))}
-          disabled={selectedWeekIndex === gameWeeks.length - 1}
-          className="bg-gray-300 px-3 py-1 rounded"
+          disabled={selectedWeekIndex >= gameWeeks.length - 1}
+          className="bg-gray-300 px-3 py-1 rounded disabled:opacity-50"
         >
           Next
         </button>
@@ -166,11 +166,6 @@ export default function PredictionsPage() {
                 />
                 <span>Bonus</span>
               </label>
-              {predictions[f.id]?.points !== null && (
-                <span className="ml-2 text-green-600 text-sm font-semibold">
-                  {predictions[f.id].points} pts
-                </span>
-              )}
             </div>
           </li>
         ))}
@@ -184,4 +179,4 @@ export default function PredictionsPage() {
       </button>
     </div>
   );
-          }
+  }
