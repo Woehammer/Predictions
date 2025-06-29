@@ -11,10 +11,12 @@ export default function PredictionsPage() {
   const [bonusPicks, setBonusPicks] = useState({});
 
   useEffect(() => {
-    if (user) fetchAllData();
+    if (user) {
+      fetchData();
+    }
   }, [user]);
 
-  const fetchAllData = async () => {
+  const fetchData = async () => {
     const { data: fixturesData } = await supabase
       .from('fixtures')
       .select('*')
@@ -108,8 +110,8 @@ export default function PredictionsPage() {
       if (error) console.error('Prediction error:', error);
     }
 
-    // Refresh predictions after saving
-    await fetchAllData();
+    // ✅ Refresh after save
+    await fetchData();
   };
 
   const week = gameWeeks[selectedWeekIndex] || [];
@@ -182,4 +184,4 @@ export default function PredictionsPage() {
       </button>
     </div>
   );
-        }
+          }
