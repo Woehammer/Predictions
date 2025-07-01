@@ -1,57 +1,50 @@
+// pages/predictions.js
+
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseclient';
-import { useSession } from '@supabase/auth-helpers-react';
+import { useUser } from '@supabase/auth-helpers-react';
 import dayjs from 'dayjs';
 
 export default function PredictionsPage() {
-  const session = useSession();
-  const user = session?.user;
-
+  const user = useUser();
   const [fixtures, setFixtures] = useState([]);
   const [gameWeeks, setGameWeeks] = useState([]);
   const [selectedWeekIndex, setSelectedWeekIndex] = useState(0);
   const [predictions, setPredictions] = useState({});
   const [bonusPicks, setBonusPicks] = useState({});
-  const [fixturePoints, setFixturePoints] = useState({});
+  const [scores, setScores] = useState({});
 
   useEffect(() => {
-    if (user) {
-      fetchFixtures();
-    }
+    if (user) fetchFixtures();
   }, [user]);
 
   const fetchFixtures = async () => {
-    const { data: fixturesData, error } = await supabase
+    const { data: fixturesData } = await supabase
       .from('fixtures')
       .select('*')
       .order('match_date');
 
-    if (error) {
-      console.error('Error fetching fixtures:', error);
-      return;
-    }
-
-    const { data: predictionsData } = await supabase
+    const { data: predictionData } = await supabase
       .from('predictions')
       .select('*')
       .eq('user_id', user.id);
 
-    const predictionsObj = {};
-    const bonusObj = {};
-    const pointsObj = {};
+    const predMap = {};
+    const bonusMap = {};
+    const scoreMap = {};
 
-    predictionsData.forEach(p => {
-      predictionsObj[p.fixture_id] = {
+    predictionData?.forEach(p => {
+      predMap[p.fixture_id] = {
         home: p.predicted_home_score,
         away: p.predicted_away_score,
       };
-      bonusObj[p.fixture_id] = p.is_bonus;
-      pointsObj[p.fixture_id] = p.points;
+      bonusMap[p.fixture_id] = p.is_bonus;
+      scoreMap[p.fixture_id] = p.points;
     });
 
-    setPredictions(predictionsObj);
-    setBonusPicks(bonusObj);
-    setFixturePoints(pointsObj);
+    setPredictions(predMap);
+    setBonusPicks(bonusMap);
+    setScores(scoreMap);
 
     const grouped = groupFixturesByWeek(fixturesData);
     setGameWeeks(grouped);
@@ -90,7 +83,7 @@ export default function PredictionsPage() {
 
   const toggleBonus = (fixtureId) => {
     const weekFixtures = gameWeeks[selectedWeekIndex];
-    const currentBonusCount = Object.values(bonusPicks).filter(b => b).length;
+    const currentBonusCount = Object.values(bonusPicks).filter(b => b === true).length;
     const maxBonuses = Math.floor(weekFixtures.length / 5);
 
     if (!bonusPicks[fixtureId] && currentBonusCount >= maxBonuses) return;
@@ -117,18 +110,17 @@ export default function PredictionsPage() {
           predicted_away_score: prediction.away,
           is_bonus: !!bonusPicks[fixture.id],
           submitted_at: new Date().toISOString(),
-        });
+        })
+        .onConflict('fixture_id,user_id'); // ⭐️ Fix added here
 
       if (error) console.error('Prediction error:', error);
     }
 
-    // Re-fetch predictions to update points after save
+    // Re-fetch predictions and scores after saving
     fetchFixtures();
   };
 
   const week = gameWeeks[selectedWeekIndex] || [];
-
-  if (!user) return <p className="p-4">Loading...</p>;
 
   return (
     <div className="p-4 max-w-3xl mx-auto">
@@ -138,14 +130,14 @@ export default function PredictionsPage() {
         <button
           onClick={() => setSelectedWeekIndex(i => Math.max(i - 1, 0))}
           disabled={selectedWeekIndex === 0}
-          className="bg-gray-300 px-3 py-1 rounded disabled:opacity-50"
+          className="bg-gray-300 px-3 py-1 rounded"
         >
           Previous
         </button>
         <button
           onClick={() => setSelectedWeekIndex(i => Math.min(i + 1, gameWeeks.length - 1))}
           disabled={selectedWeekIndex === gameWeeks.length - 1}
-          className="bg-gray-300 px-3 py-1 rounded disabled:opacity-50"
+          className="bg-gray-300 px-3 py-1 rounded"
         >
           Next
         </button>
@@ -180,9 +172,9 @@ export default function PredictionsPage() {
                 />
                 <span>Bonus</span>
               </label>
-              <span className="ml-2 text-green-600 text-sm">
-                {fixturePoints[f.id] != null ? `${fixturePoints[f.id]} pts` : ''}
-              </span>
+              {scores[f.id] !== undefined && (
+                <span className="ml-4 text-green-600 text-sm font-medium">Points: {scores[f.id]}</span>
+              )}
             </div>
           </li>
         ))}
@@ -196,4 +188,4 @@ export default function PredictionsPage() {
       </button>
     </div>
   );
-      }
+}
