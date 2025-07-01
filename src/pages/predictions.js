@@ -15,7 +15,9 @@ export default function PredictionsPage() {
   const [scores, setScores] = useState({});
 
   useEffect(() => {
-    if (user) fetchFixtures();
+    if (user) {
+      fetchFixtures();
+    }
   }, [user]);
 
   const fetchFixtures = async () => {
@@ -24,30 +26,35 @@ export default function PredictionsPage() {
       .select('*')
       .order('match_date');
 
-    const { data: predictionData } = await supabase
+    if (!fixturesData) return;
+
+    const grouped = groupFixturesByWeek(fixturesData);
+    setGameWeeks(grouped);
+
+    // Load existing predictions
+    const { data: userPredictions } = await supabase
       .from('predictions')
       .select('*')
       .eq('user_id', user.id);
 
-    const predMap = {};
-    const bonusMap = {};
-    const scoreMap = {};
+    if (userPredictions) {
+      const predictionMap = {};
+      const bonusMap = {};
+      const scoreMap = {};
 
-    predictionData?.forEach(p => {
-      predMap[p.fixture_id] = {
-        home: p.predicted_home_score,
-        away: p.predicted_away_score,
-      };
-      bonusMap[p.fixture_id] = p.is_bonus;
-      scoreMap[p.fixture_id] = p.points;
-    });
+      userPredictions.forEach(p => {
+        predictionMap[p.fixture_id] = {
+          home: p.predicted_home_score,
+          away: p.predicted_away_score,
+        };
+        bonusMap[p.fixture_id] = p.is_bonus;
+        scoreMap[p.fixture_id] = p.points;
+      });
 
-    setPredictions(predMap);
-    setBonusPicks(bonusMap);
-    setScores(scoreMap);
-
-    const grouped = groupFixturesByWeek(fixturesData);
-    setGameWeeks(grouped);
+      setPredictions(predictionMap);
+      setBonusPicks(bonusMap);
+      setScores(scoreMap);
+    }
   };
 
   const groupFixturesByWeek = (fixtures) => {
@@ -110,13 +117,14 @@ export default function PredictionsPage() {
           predicted_away_score: prediction.away,
           is_bonus: !!bonusPicks[fixture.id],
           submitted_at: new Date().toISOString(),
-        })
-        .onConflict('fixture_id,user_id'); // ⭐️ Fix added here
+        }, {
+          onConflict: ['fixture_id', 'user_id'],
+        });
 
       if (error) console.error('Prediction error:', error);
     }
 
-    // Re-fetch predictions and scores after saving
+    // Refresh after saving
     fetchFixtures();
   };
 
@@ -124,7 +132,7 @@ export default function PredictionsPage() {
 
   return (
     <div className="p-4 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Predictions - Game Week {selectedWeekIndex + 1}</h1>
+      <h1 className="text-2xl font-bold mb-4">Predictions — Game Week {selectedWeekIndex + 1}</h1>
 
       <div className="flex justify-between mb-4">
         <button
@@ -152,7 +160,7 @@ export default function PredictionsPage() {
               <input
                 type="number"
                 placeholder="Home"
-                value={predictions[f.id]?.home || ''}
+                value={predictions[f.id]?.home ?? ''}
                 onChange={e => handlePredictionChange(f.id, 'home', e.target.value)}
                 className="border p-1 w-16"
               />
@@ -160,7 +168,7 @@ export default function PredictionsPage() {
               <input
                 type="number"
                 placeholder="Away"
-                value={predictions[f.id]?.away || ''}
+                value={predictions[f.id]?.away ?? ''}
                 onChange={e => handlePredictionChange(f.id, 'away', e.target.value)}
                 className="border p-1 w-16"
               />
@@ -173,7 +181,7 @@ export default function PredictionsPage() {
                 <span>Bonus</span>
               </label>
               {scores[f.id] !== undefined && (
-                <span className="ml-4 text-green-600 text-sm font-medium">Points: {scores[f.id]}</span>
+                <span className="ml-4 text-green-600 text-sm font-medium">Points: {scores[f.id] ?? 0}</span>
               )}
             </div>
           </li>
@@ -188,4 +196,4 @@ export default function PredictionsPage() {
       </button>
     </div>
   );
-}
+          }
