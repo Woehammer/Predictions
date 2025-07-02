@@ -113,6 +113,14 @@ export default function PredictionsPage() {
       const prediction = predictions[fixture.id];
       if (!prediction || prediction.home === '' || prediction.away === '') continue;
 
+      console.log({
+  fixture_id: fixture.id,
+  user_id: user.id,
+  predicted_home_score: prediction.home,
+  predicted_away_score: prediction.away,
+  is_bonus: !!bonusPicks[fixture.id],
+});
+      
       const { error } = await supabase
         .from('predictions')
         .upsert({
