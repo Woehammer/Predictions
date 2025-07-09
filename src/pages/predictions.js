@@ -38,7 +38,6 @@ export default function PredictionsPage() {
       return;
     }
 
-    // Build predictions & bonus states
     const predMap = {};
     const bonusMap = {};
     const scoreMap = {};
@@ -113,23 +112,21 @@ export default function PredictionsPage() {
       const prediction = predictions[fixture.id];
       if (!prediction || prediction.home === '' || prediction.away === '') continue;
 
-      console.log({
-  fixture_id: fixture.id,
-  user_id: user.id,
-  predicted_home_score: prediction.home,
-  predicted_away_score: prediction.away,
-  is_bonus: !!bonusPicks[fixture.id],
-});
-      
+      const payload = {
+        fixture_id: fixture.id,
+        user_id: user.id,
+        predicted_home_score: prediction.home === '' ? null : Number(prediction.home),
+        predicted_away_score: prediction.away === '' ? null : Number(prediction.away),
+        is_bonus: !!bonusPicks[fixture.id],
+        submitted_at: new Date().toISOString(),
+      };
+
+      console.log("Upsert payload", payload);
+
       const { error } = await supabase
         .from('predictions')
-        .upsert({
-          fixture_id: fixture.id,
-          user_id: user.id,
-          predicted_home_score: Number(prediction.home),
-          predicted_away_score: Number(prediction.away),
-          is_bonus: !!bonusPicks[fixture.id],
-          submitted_at: new Date().toISOString(),
+        .upsert(payload, {
+          onConflict: ['fixture_id', 'user_id'],
         });
 
       if (error) {
@@ -140,7 +137,7 @@ export default function PredictionsPage() {
 
     if (allSuccess) {
       setMessage('Predictions saved!');
-      fetchFixtures(); // Refresh predictions and points
+      fetchFixtures();
     } else {
       setMessage('Error saving some predictions. Check console.');
     }
@@ -216,4 +213,4 @@ export default function PredictionsPage() {
       {message && <p className="mt-2 text-green-600">{message}</p>}
     </div>
   );
-            }
+}
