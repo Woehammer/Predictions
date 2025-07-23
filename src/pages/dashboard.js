@@ -123,7 +123,7 @@ return ( <div className="p-4 max-w-3xl mx-auto"> <h1 className="text-2xl font-bo
     {leagues.map(league => (
       <li key={league.id} className="flex justify-between items-center border-b py-2">
         <div>
-          <Link href={`/league/${league.id}`} className="text-blue-600 underline hover:text-blue-800">
+          <Link href={`/leagues/${league.id}`} className="text-blue-600 underline hover:text-blue-800">
             {league.name}
           </Link>
           {!league.is_public && league.invite_code && (
