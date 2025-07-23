@@ -1,3 +1,5 @@
+import { useUser } from '@supabase/auth-helpers-react';
+
 import { useRouter } from 'next/router';
 
 // pages/leagues/[leagueId].js import { useRouter } from 'next/router'; import { useEffect, useState } from 'react'; import { supabase } from '@/lib/supabaseclient'; import { useUser } from '@supabase/auth-helpers-react';
