@@ -20,7 +20,7 @@ export default function PredictionsPage() {
   const fetchFixtures = async () => {
     const { data: fixturesData, error: fixturesError } = await supabase
       .from('fixtures')
-      .select('*')
+      .select('id, home_team, away_team, match_date, actual_home_score, actual_away_score')
       .order('match_date');
 
     if (fixturesError) {
@@ -30,7 +30,7 @@ export default function PredictionsPage() {
 
     const { data: predictionsData, error: predError } = await supabase
       .from('predictions')
-      .select('*')
+      .select('fixture_id, predicted_home_score, predicted_away_score, is_bonus, points')
       .eq('user_id', user.id);
 
     if (predError) {
@@ -105,7 +105,6 @@ export default function PredictionsPage() {
 
   const savePredictions = async () => {
     const weekFixtures = gameWeeks[selectedWeekIndex];
-
     let allSuccess = true;
 
     for (const fixture of weekFixtures) {
@@ -115,13 +114,11 @@ export default function PredictionsPage() {
       const payload = {
         fixture_id: fixture.id,
         user_id: user.id,
-        predicted_home_score: prediction.home === '' ? null : Number(prediction.home),
-        predicted_away_score: prediction.away === '' ? null : Number(prediction.away),
+        predicted_home_score: Number(prediction.home),
+        predicted_away_score: Number(prediction.away),
         is_bonus: !!bonusPicks[fixture.id],
         submitted_at: new Date().toISOString(),
       };
-
-      console.log("Upsert payload", payload);
 
       const { error } = await supabase
         .from('predictions')
@@ -172,6 +169,13 @@ export default function PredictionsPage() {
         <div key={f.id} className="mb-4 border p-3 rounded">
           <div className="font-bold">{f.home_team} vs {f.away_team}</div>
           <div className="text-sm text-gray-600">{new Date(f.match_date).toLocaleString()}</div>
+
+          {f.actual_home_score != null && f.actual_away_score != null && (
+            <div className="text-sm text-green-600 mt-1">
+              Final Score: {f.actual_home_score}–{f.actual_away_score}
+            </div>
+          )}
+
           <div className="flex items-center gap-2 mt-2">
             <input
               type="number"
@@ -213,4 +217,4 @@ export default function PredictionsPage() {
       {message && <p className="mt-2 text-green-600">{message}</p>}
     </div>
   );
-}
+    }
