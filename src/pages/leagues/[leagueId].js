@@ -25,24 +25,36 @@ export default function LeaguePage() {
       .from('league_members')
       .select(`
         user_id,
-        users(username),
-        user_points(total_points),
-        leagues(name)
+        profiles ( username ),
+        user_points ( total_points )
       `)
-      .eq('league_id', leagueId)
-      .order('user_points.total_points', { ascending: false });
+      .eq('league_id', leagueId);
 
-    if (error) console.error('Leaderboard error:', error);
-    else {
+    if (error) {
+      console.error('Leaderboard error:', error);
+    } else {
       setMembers(data);
-      if (data.length > 0) setLeagueName(data[0].leagues.name);
+
+      // Fetch league name separately
+      const { data: leagueData, error: leagueError } = await supabase
+        .from('leagues')
+        .select('name')
+        .eq('id', leagueId)
+        .single();
+
+      if (!leagueError) setLeagueName(leagueData?.name || '');
     }
   };
 
   const fetchMessages = async () => {
     const { data, error } = await supabase
       .from('league_messages')
-      .select('message, created_at, user_id, users(username)')
+      .select(`
+        message,
+        created_at,
+        user_id,
+        profiles ( username )
+      `)
       .eq('league_id', leagueId)
       .order('created_at', { ascending: true });
 
@@ -78,7 +90,7 @@ export default function LeaguePage() {
             className="border-b px-4 py-2 flex justify-between items-center"
           >
             <span>
-              {i + 1}. {m.users?.username || m.user_id.slice(0, 6)}
+              {i + 1}. {m.profiles?.username || m.user_id.slice(0, 6)}
             </span>
             <span className="text-blue-600 font-semibold">
               {m.user_points?.total_points ?? 0} pts
@@ -92,7 +104,7 @@ export default function LeaguePage() {
         {messages.map((msg, idx) => (
           <div key={idx} className="mb-1">
             <span className="text-sm text-gray-600">
-              {msg.users?.username || msg.user_id.slice(0, 6)}:
+              {msg.profiles?.username || msg.user_id.slice(0, 6)}:
             </span>{' '}
             <span>{msg.message}</span>
           </div>
