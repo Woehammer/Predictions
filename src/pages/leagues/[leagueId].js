@@ -1,3 +1,5 @@
+import { useRouter } from 'next/router';
+
 // pages/leagues/[leagueId].js import { useRouter } from 'next/router'; import { useEffect, useState } from 'react'; import { supabase } from '@/lib/supabaseclient'; import { useUser } from '@supabase/auth-helpers-react';
 
 export default function LeaguePage() { const router = useRouter(); const { leagueId } = router.query; const user = useUser();
