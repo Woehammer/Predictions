@@ -17,6 +17,8 @@ export default function UserDashboard() {
   const [error, setError] = useState('');
   const [recentResults, setRecentResults] = useState([]);
   const [upcomingFixtures, setUpcomingFixtures] = useState([]);
+  const [username, setUsername] = useState('');
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -28,7 +30,8 @@ export default function UserDashboard() {
         .eq('user_id', user.id);
 
       if (memberError) console.error('League member error:', memberError);
-      const leagueIds = memberships?.map((m) => m.league_id) || [];
+
+      const leagueIds = memberships?.map(m => m.league_id) || [];
 
       const { data: userLeagues, error: leaguesError } = await supabase
         .from('leagues')
@@ -71,6 +74,14 @@ export default function UserDashboard() {
         .limit(5);
 
       setUpcomingFixtures(fixtures || []);
+
+      const { data: userData } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('user_id', user.id)
+        .single();
+
+      setUsername(userData?.username || '');
     };
 
     fetchData();
@@ -140,6 +151,21 @@ export default function UserDashboard() {
     setLeagues((prev) => [...prev, newLeague]);
   };
 
+  const handleUsernameChange = async () => {
+    const { error } = await supabase
+      .from('profiles')
+      .upsert({ user_id: user.id, username })
+      .single();
+
+    if (error) {
+      setError('Failed to update username.');
+      console.error(error);
+    } else {
+      setSuccessMessage('Username updated successfully!');
+      setIsEditingUsername(false);
+    }
+  };
+
   if (!user) return <p className="p-4">Loading...</p>;
 
   return (
@@ -149,6 +175,28 @@ export default function UserDashboard() {
       <p className="mb-4">
         Total Points: <strong>{points}</strong>
       </p>
+
+      <h2 className="text-xl font-semibold mt-6 mb-2">Your Profile</h2>
+      <div className="mb-4">
+        <p>Username: {isEditingUsername ? (
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            className="border px-2 py-1 mb-2"
+          />
+        ) : (
+          <span>{username}</span>
+        )}
+        </p>
+        {isEditingUsername ? (
+          <button onClick={handleUsernameChange} className="bg-green-500 text-white px-4 py-1 rounded">Save</button>
+        ) : (
+          <button onClick={() => setIsEditingUsername(true)} className="bg-blue-500 text-white px-4 py-1 rounded">Edit Username</button>
+        )}
+        {successMessage && <p className="text-green-600">{successMessage}</p>}
+        {error && <p className="text-red-600">{error}</p>}
+      </div>
 
       <h2 className="text-xl font-semibold mt-6 mb-2">Your Leagues</h2>
       <ul className="mb-4">
@@ -251,4 +299,4 @@ export default function UserDashboard() {
       </Link>
     </div>
   );
-                }
+            }
