@@ -21,34 +21,37 @@ export default function LeaguePage() {
   }, [leagueId]);
 
   const fetchLeaderboard = async () => {
-    const { data, error } = await supabase
-      .from('league_members')
-      .select(`
-  user_id,
-  profiles ( id, username ),
-  user_points ( total_points )
-`)
-      .eq('league_id', leagueId);
+  const { data, error } = await supabase
+    .from('league_members')
+    .select(`
+      user_id,
+      profiles ( id, username ),
+      user_points ( total_points )
+    `)
+    .eq('league_id', leagueId);
 
-    if (error) {
-      console.error('Leaderboard error:', error);
-      return;
-    }
+  if (error) {
+    console.error('Leaderboard error:', error);
+    return;
+  }
 
-    const sorted = [...data].sort(
-      (a, b) => (b.user_points?.total_points || 0) - (a.user_points?.total_points || 0)
-    );
+  console.log("Fetched members:", data);
 
-    setMembers(sorted);
+  const sorted = [...data].sort(
+    (a, b) => (b.user_points?.total_points || 0) - (a.user_points?.total_points || 0)
+  );
 
-    const { data: leagueData, error: leagueError } = await supabase
-      .from('leagues')
-      .select('name')
-      .eq('id', leagueId)
-      .single();
+  setMembers(sorted);
 
-    if (!leagueError) setLeagueName(leagueData?.name || '');
-  };
+  // Fetch league name
+  const { data: leagueData, error: leagueError } = await supabase
+    .from('leagues')
+    .select('name')
+    .eq('id', leagueId)
+    .single();
+
+  if (!leagueError) setLeagueName(leagueData?.name || '');
+};
 
   const fetchMessages = async () => {
     const { data, error } = await supabase
