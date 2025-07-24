@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'; import { supabase } from '@/lib/sup
 
 export default function UserDashboard() { const session = useSession(); const user = session?.user;
 
-const [points, setPoints] = useState(0); const [leagues, setLeagues] = useState([]); const [publicLeagues, setPublicLeagues] = useState([]); const [inviteCode, setInviteCode] = useState(''); const [newLeagueName, setNewLeagueName] = useState(''); const [isPublic, setIsPublic] = useState(false); const [successMessage, setSuccessMessage] = useState(''); const [error, setError] = useState(''); const [recentResults, setRecentResults] = useState([]); const [upcomingFixtures, setUpcomingFixtures] = useState([]); const [username, setUsername] = useState(''); const [isEditingUsername, setIsEditingUsername] = useState(false);
+const [points, setPoints] = useState(0); const [leagues, setLeagues] = useState([]); const [publicLeagues, setPublicLeagues] = useState([]); const [inviteCode, setInviteCode] = useState(''); const [newLeagueName, setNewLeagueName] = useState(''); const [successMessage, setSuccessMessage] = useState(''); const [error, setError] = useState(''); const [recentResults, setRecentResults] = useState([]); const [upcomingFixtures, setUpcomingFixtures] = useState([]); const [username, setUsername] = useState(''); const [isEditingUsername, setIsEditingUsername] = useState(false);
 
 useEffect(() => { if (!user) return;
 
@@ -71,7 +71,52 @@ fetchData();
 
 }, [user]);
 
-const joinLeague = async () => { await supabase.rpc('join_league_by_code', { user_id_input: user.id, invite_code_input: inviteCode, }); setInviteCode(''); };
+const joinLeague = async () => { if (!inviteCode.trim()) return;
+
+const { data: league, error: leagueError } = await supabase
+  .from('leagues')
+  .select('id, name, is_public, invite_code')
+  .eq('invite_code', inviteCode.trim())
+  .single();
+
+if (leagueError || !league) {
+  setError('League not found.');
+  return;
+}
+
+const { data: existing, error: existingError } = await supabase
+  .from('league_members')
+  .select('id')
+  .eq('user_id', user.id)
+  .eq('league_id', league.id)
+  .single();
+
+if (existing) {
+  setError('You are already a member of this league.');
+  return;
+}
+
+const { error: insertError } = await supabase
+  .from('league_members')
+  .insert({ user_id: user.id, league_id: league.id });
+
+if (insertError) {
+  setError('Failed to join league.');
+  console.error(insertError);
+  return;
+}
+
+setSuccessMessage('Successfully joined the league!');
+setInviteCode('');
+
+const { data: updatedLeagues } = await supabase
+  .from('leagues')
+  .select('id, name, is_public, invite_code')
+  .in('id', [...leagues.map((l) => l.id), league.id]);
+
+setLeagues(updatedLeagues || []);
+
+};
 
 const leaveLeague = async (leagueId) => { await supabase .from('league_members') .delete() .match({ user_id: user.id, league_id: leagueId });
 
@@ -81,7 +126,7 @@ setLeagues(leagues.filter((l) => l.id !== leagueId));
 
 const createLeague = async () => { setError(''); setSuccessMessage(''); if (!newLeagueName.trim()) { setError('Please enter a league name.'); return; }
 
-const code = null; // Invite-only for now
+const code = null;
 
 const { data, error } = await supabase
   .from('leagues')
@@ -115,7 +160,6 @@ if (memberError) {
 }
 
 setNewLeagueName('');
-setIsPublic(false);
 setSuccessMessage(`League "${newLeague.name}" created!`);
 setLeagues((prev) => [...prev, newLeague]);
 
@@ -139,21 +183,26 @@ return ( <div className="p-4 max-w-3xl mx-auto"> <h1 className="text-2xl font-bo
 
 <h2 className="text-xl font-semibold mt-6 mb-2">Your Profile</h2>
   <div className="mb-4">
-    <p>Username: {isEditingUsername ? (
-      <input
-        type="text"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-        className="border px-2 py-1 mb-2"
-      />
-    ) : (
-      <span>{username}</span>
-    )}
+    <p>
+      Username: {isEditingUsername ? (
+        <input
+          type="text"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          className="border px-2 py-1 mb-2"
+        />
+      ) : (
+        <span>{username}</span>
+      )}
     </p>
     {isEditingUsername ? (
-      <button onClick={handleUsernameChange} className="bg-green-500 text-white px-4 py-1 rounded">Save</button>
+      <button onClick={handleUsernameChange} className="bg-green-500 text-white px-4 py-1 rounded">
+        Save
+      </button>
     ) : (
-      <button onClick={() => setIsEditingUsername(true)} className="bg-blue-500 text-white px-4 py-1 rounded">Edit Username</button>
+      <button onClick={() => setIsEditingUsername(true)} className="bg-blue-500 text-white px-4 py-1 rounded">
+        Edit Username
+      </button>
     )}
     {successMessage && <p className="text-green-600">{successMessage}</p>}
     {error && <p className="text-red-600">{error}</p>}
@@ -164,10 +213,7 @@ return ( <div className="p-4 max-w-3xl mx-auto"> <h1 className="text-2xl font-bo
     {leagues.map((league) => (
       <li key={league.id} className="flex justify-between items-center border-b py-2">
         <div>
-          <Link
-            href={`/leagues/${league.id}`}
-            className="text-blue-600 underline hover:text-blue-800"
-          >
+          <Link href={`/leagues/${league.id}`} className="text-blue-600 underline hover:text-blue-800">
             {league.name}
           </Link>
           {!league.is_public && league.invite_code && (
@@ -176,10 +222,7 @@ return ( <div className="p-4 max-w-3xl mx-auto"> <h1 className="text-2xl font-bo
             </span>
           )}
         </div>
-        <button
-          onClick={() => leaveLeague(league.id)}
-          className="text-red-500 text-sm"
-        >
+        <button onClick={() => leaveLeague(league.id)} className="text-red-500 text-sm">
           Leave
         </button>
       </li>
@@ -194,10 +237,7 @@ return ( <div className="p-4 max-w-3xl mx-auto"> <h1 className="text-2xl font-bo
       placeholder="Enter invite code"
       className="border px-2 py-1 mr-2"
     />
-    <button
-      onClick={joinLeague}
-      className="bg-blue-500 text-white px-4 py-1 rounded"
-    >
+    <button onClick={joinLeague} className="bg-blue-500 text-white px-4 py-1 rounded">
       Join
     </button>
   </div>
@@ -213,10 +253,7 @@ return ( <div className="p-4 max-w-3xl mx-auto"> <h1 className="text-2xl font-bo
       placeholder="League name"
       className="border px-2 py-1 w-full mb-2 text-black"
     />
-    <button
-      onClick={createLeague}
-      className="bg-green-600 text-white px-4 py-2 rounded w-full"
-    >
+    <button onClick={createLeague} className="bg-green-600 text-white px-4 py-2 rounded w-full">
       Create League
     </button>
   </div>
@@ -252,14 +289,10 @@ return ( <div className="p-4 max-w-3xl mx-auto"> <h1 className="text-2xl font-bo
     ))}
   </ul>
 
-  <Link
-    href="/predictions"
-    className="block text-center bg-blue-700 text-white px-4 py-2 rounded"
-  >
+  <Link href="/predictions" className="block text-center bg-blue-700 text-white px-4 py-2 rounded">
     Go to Predictions
   </Link>
 </div>
 
 ); }
-
 
