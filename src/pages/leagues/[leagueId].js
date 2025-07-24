@@ -22,21 +22,21 @@ export default function LeaguePage() {
 
   const fetchLeaderboard = async () => {
     const { data, error } = await supabase
-  .from('league_members')
-  .select(`
-    user_id,
-    profiles:profiles!id(id, username),
-    user_points:user_points(user_id, total_points)
-  `)
-  .eq('league_id', leagueId);
+      .from('league_members')
+      .select(`
+        user_id,
+        profiles:profiles!id(id, username),
+        user_points:user_points(user_id, total_points)
+      `)
+      .eq('league_id', leagueId);
 
     if (error) {
       console.error('Leaderboard error:', error);
       return;
     }
 
-    const sorted = [...data].sort((a, b) => 
-      (b.user_points?.total_points || 0) - (a.user_points?.total_points || 0)
+    const sorted = [...data].sort(
+      (a, b) => (b.user_points?.total_points || 0) - (a.user_points?.total_points || 0)
     );
 
     setMembers(sorted);
@@ -57,13 +57,16 @@ export default function LeaguePage() {
         message,
         created_at,
         user_id,
-        profiles ( username )
+        profiles:profiles!id(username)
       `)
       .eq('league_id', leagueId)
       .order('created_at', { ascending: true });
 
-    if (error) console.error('Message fetch error:', error);
-    else setMessages(data);
+    if (error) {
+      console.error('Message fetch error:', error);
+    } else {
+      setMessages(data);
+    }
   };
 
   const sendMessage = async () => {
@@ -138,4 +141,4 @@ export default function LeaguePage() {
       </div>
     </div>
   );
-    }
+}
