@@ -22,13 +22,13 @@ export default function LeaguePage() {
 
   const fetchLeaderboard = async () => {
     const { data, error } = await supabase
-      .from('league_members')
-      .select(`
-        user_id,
-        profiles:profiles!user_id(id, username ),
-        user_points:user_points(user_id, total_points )
-      `)
-      .eq('league_id', leagueId);
+  .from('league_members')
+  .select(`
+    user_id,
+    profiles:profiles!id(id, username),
+    user_points:user_points(user_id, total_points)
+  `)
+  .eq('league_id', leagueId);
 
     if (error) {
       console.error('Leaderboard error:', error);
