@@ -10,8 +10,7 @@ export default function Navbar() {
         <div className="flex justify-between items-center h-16">
           {/* Site Name */}
           <div className="flex-shrink-0">
-            <Link href="/" className="text-xl font-bold text-blue-600">Predictify</Link>
-          </div>
+            <Link href="/" className="text-xl font-bold text-white">Predictify</Link>
 
           {/* Mobile Menu Toggle */}
           <div className="md:hidden">
