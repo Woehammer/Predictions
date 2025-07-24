@@ -16,7 +16,6 @@ export default function Login() {
     if (error) {
       alert('Login failed: ' + error.message);
     } else {
-      alert('Logged in!');
       router.push('/dashboard');
     }
   };
