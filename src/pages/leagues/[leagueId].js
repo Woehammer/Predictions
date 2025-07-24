@@ -25,8 +25,8 @@ export default function LeaguePage() {
       .from('league_members')
       .select(`
         user_id,
-        profiles( username ),
-        user_points ( total_points )
+        profiles:profiles!user_id(id, username ),
+        user_points:user_points(user_id, total_points )
       `)
       .eq('league_id', leagueId);
 
