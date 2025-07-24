@@ -142,3 +142,26 @@ export default function LeaguePage() {
     </div>
   );
 }
+const fetchLeaderboard = async () => {
+  const { data, error } = await supabase
+    .from('league_members')
+    .select(`
+      user_id,
+      profiles:profiles!id(id, username),
+      user_points:user_points(user_id, total_points)
+    `)
+    .eq('league_id', leagueId);
+
+  console.log("Leaderboard raw data:", data);
+
+  if (error) {
+    console.error('Leaderboard error:', error);
+    return;
+  }
+
+  const sorted = [...data].sort(
+    (a, b) => (b.user_points?.total_points || 0) - (a.user_points?.total_points || 0)
+  );
+
+  setMembers(sorted);
+};
