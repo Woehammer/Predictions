@@ -21,37 +21,49 @@ export default function LeaguePage() {
   }, [leagueId]);
 
   const fetchLeaderboard = async () => {
-  const { data, error } = await supabase
-    .from('league_members')
-    .select(`
-      user_id,
-      profiles ( id, username ),
-      user_points ( total_points )
-    `)
-    .eq('league_id', leagueId);
+    const { data: leagueMembers, error } = await supabase
+      .from('league_members')
+      .select('user_id')
+      .eq('league_id', leagueId);
 
-  if (error) {
-    console.error('Leaderboard error:', error);
-    return;
-  }
+    if (error) {
+      console.error('LeagueMembers error:', error);
+      return;
+    }
 
-  console.log("Fetched members:", data);
+    const userIds = leagueMembers.map((m) => m.user_id);
 
-  const sorted = [...data].sort(
-    (a, b) => (b.user_points?.total_points || 0) - (a.user_points?.total_points || 0)
-  );
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, username')
+      .in('id', userIds);
 
-  setMembers(sorted);
+    const { data: points } = await supabase
+      .from('user_points')
+      .select('user_id, total_points')
+      .in('user_id', userIds);
 
-  // Fetch league name
-  const { data: leagueData, error: leagueError } = await supabase
-    .from('leagues')
-    .select('name')
-    .eq('id', leagueId)
-    .single();
+    const combined = leagueMembers.map((m) => {
+      const profile = profiles?.find((p) => p.id === m.user_id);
+      const point = points?.find((p) => p.user_id === m.user_id);
+      return {
+        user_id: m.user_id,
+        username: profile?.username ?? m.user_id.slice(0, 6),
+        total_points: point?.total_points ?? 0,
+      };
+    });
 
-  if (!leagueError) setLeagueName(leagueData?.name || '');
-};
+    const sorted = combined.sort((a, b) => b.total_points - a.total_points);
+    setMembers(sorted);
+
+    const { data: leagueData, error: leagueError } = await supabase
+      .from('leagues')
+      .select('name')
+      .eq('id', leagueId)
+      .single();
+
+    if (!leagueError) setLeagueName(leagueData?.name || '');
+  };
 
   const fetchMessages = async () => {
     const { data, error } = await supabase
@@ -60,16 +72,13 @@ export default function LeaguePage() {
         message,
         created_at,
         user_id,
-        profiles:profiles!id(username)
+        profiles ( username )
       `)
       .eq('league_id', leagueId)
       .order('created_at', { ascending: true });
 
-    if (error) {
-      console.error('Message fetch error:', error);
-    } else {
-      setMessages(data);
-    }
+    if (error) console.error('Message fetch error:', error);
+    else setMessages(data);
   };
 
   const sendMessage = async () => {
@@ -106,10 +115,10 @@ export default function LeaguePage() {
               className="border-b px-4 py-2 flex justify-between items-center"
             >
               <span>
-                {i + 1}. {m.profiles?.username || m.user_id.slice(0, 6)}
+                {i + 1}. {m.username}
               </span>
               <span className="text-blue-600 font-semibold">
-                {m.user_points?.total_points ?? 0} pts
+                {m.total_points} pts
               </span>
             </li>
           ))}
@@ -144,27 +153,4 @@ export default function LeaguePage() {
       </div>
     </div>
   );
-}
-const fetchLeaderboard = async () => {
-  const { data, error } = await supabase
-    .from('league_members')
-    .select(`
-      user_id,
-      profiles:profiles!id(id, username),
-      user_points:user_points(user_id, total_points)
-    `)
-    .eq('league_id', leagueId);
-
-  console.log("Leaderboard raw data:", data);
-
-  if (error) {
-    console.error('Leaderboard error:', error);
-    return;
-  }
-
-  const sorted = [...data].sort(
-    (a, b) => (b.user_points?.total_points || 0) - (a.user_points?.total_points || 0)
-  );
-
-  setMembers(sorted);
-};
+    }
