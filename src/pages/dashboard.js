@@ -1,3 +1,6 @@
+<div className="p-4 max-w-3xl mx-auto mt-6">
+  {/* your page content */}
+</div>
 import { useEffect, useState } from 'react'; import { supabase } from '@/lib/supabaseclient'; import Link from 'next/link'; import { useSession } from '@supabase/auth-helpers-react';
 
 export default function UserDashboard() { const session = useSession(); const user = session?.user;
