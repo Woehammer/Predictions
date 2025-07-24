@@ -32,18 +32,22 @@ export default function LeaguePage() {
 
     if (error) {
       console.error('Leaderboard error:', error);
-    } else {
-      setMembers(data);
-
-      // Fetch league name separately
-      const { data: leagueData, error: leagueError } = await supabase
-        .from('leagues')
-        .select('name')
-        .eq('id', leagueId)
-        .single();
-
-      if (!leagueError) setLeagueName(leagueData?.name || '');
+      return;
     }
+
+    const sorted = [...data].sort((a, b) => 
+      (b.user_points?.total_points || 0) - (a.user_points?.total_points || 0)
+    );
+
+    setMembers(sorted);
+
+    const { data: leagueData, error: leagueError } = await supabase
+      .from('leagues')
+      .select('name')
+      .eq('id', leagueId)
+      .single();
+
+    if (!leagueError) setLeagueName(leagueData?.name || '');
   };
 
   const fetchMessages = async () => {
@@ -71,33 +75,40 @@ export default function LeaguePage() {
       message: newMessage.trim(),
     });
 
-    if (error) console.error('Send error:', error);
-    else {
+    if (error) {
+      console.error('Send error:', error);
+    } else {
       setNewMessage('');
       fetchMessages();
     }
   };
 
+  if (!leagueId) return <p className="p-4">Loading...</p>;
+
   return (
     <div className="p-4 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">League: {leagueName}</h1>
+      <h1 className="text-2xl font-bold mb-4">League: {leagueName || 'Loading...'}</h1>
 
       <h2 className="text-xl font-semibold mb-2">Leaderboard</h2>
-      <ul className="mb-6 border rounded">
-        {members.map((m, i) => (
-          <li
-            key={m.user_id}
-            className="border-b px-4 py-2 flex justify-between items-center"
-          >
-            <span>
-              {i + 1}. {m.profiles?.username || m.user_id.slice(0, 6)}
-            </span>
-            <span className="text-blue-600 font-semibold">
-              {m.user_points?.total_points ?? 0} pts
-            </span>
-          </li>
-        ))}
-      </ul>
+      {members.length === 0 ? (
+        <p className="text-gray-500 mb-4">No members found.</p>
+      ) : (
+        <ul className="mb-6 border rounded">
+          {members.map((m, i) => (
+            <li
+              key={m.user_id}
+              className="border-b px-4 py-2 flex justify-between items-center"
+            >
+              <span>
+                {i + 1}. {m.profiles?.username || m.user_id.slice(0, 6)}
+              </span>
+              <span className="text-blue-600 font-semibold">
+                {m.user_points?.total_points ?? 0} pts
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <h2 className="text-xl font-semibold mb-2">Chat</h2>
       <div className="border rounded h-64 overflow-y-auto p-2 mb-2 bg-white">
@@ -127,4 +138,4 @@ export default function LeaguePage() {
       </div>
     </div>
   );
-}
+    }
