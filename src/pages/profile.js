@@ -1,214 +1,101 @@
-<div className="p-4 max-w-3xl mx-auto mt-6">
-  {/* your page content */}
-</div>
-import { useEffect, useState } from 'react'; import { supabase } from '@/lib/supabaseclient'; import Link from 'next/link'; import { useSession } from '@supabase/auth-helpers-react';
+import { useEffect, useState } from 'react'; import { supabase } from '@/lib/supabaseclient'; import { useSession } from '@supabase/auth-helpers-react'; import Link from 'next/link';
 
-export default function UserDashboard() { const session = useSession(); const user = session?.user;
+export default function UserProfile() { const session = useSession(); const user = session?.user;
 
-const [points, setPoints] = useState(0); const [leagues, setLeagues] = useState([]); const [publicLeagues, setPublicLeagues] = useState([]); const [inviteCode, setInviteCode] = useState(''); const [newLeagueName, setNewLeagueName] = useState(''); const [successMessage, setSuccessMessage] = useState(''); const [error, setError] = useState(''); const [recentResults, setRecentResults] = useState([]); const [upcomingFixtures, setUpcomingFixtures] = useState([]); const [username, setUsername] = useState(''); const [profileMessage, setProfileMessage] = useState('');
+const [username, setUsername] = useState(''); const [profileMessage, setProfileMessage] = useState(''); const [profilePic, setProfilePic] = useState(null); const [favTeam, setFavTeam] = useState('');
 
 useEffect(() => { if (!user) return;
 
 const fetchData = async () => {
-  const { data: memberships } = await supabase
-    .from('league_members')
-    .select('league_id')
-    .eq('user_id', user.id);
-
-  const leagueIds = memberships?.map((m) => m.league_id) || [];
-
-  const { data: userLeagues } = await supabase
-    .from('leagues')
-    .select('id, name, is_public, invite_code')
-    .in('id', leagueIds);
-
-  setLeagues(userLeagues || []);
-
-  const { data: pointsData } = await supabase
-    .from('user_points')
-    .select('total_points')
-    .eq('user_id', user.id)
-    .single();
-
-  setPoints(pointsData?.total_points || 0);
-
-  const { data: publicData } = await supabase
-    .from('leagues')
-    .select()
-    .eq('is_public', true);
-
-  setPublicLeagues(publicData || []);
-
-  const { data: results } = await supabase
-    .from('predictions')
-    .select('fixtures(home_team, away_team, actual_home_score, actual_away_score), predicted_home_score, predicted_away_score')
-    .eq('user_id', user.id)
-    .not('fixtures.actual_home_score', 'is', null)
-    .order('created_at', { ascending: false })
-    .limit(5);
-
-  setRecentResults(results || []);
-
-  const { data: fixtures } = await supabase
-    .from('fixtures')
-    .select()
-    .gt('match_date', new Date().toISOString())
-    .order('match_date')
-    .limit(5);
-
-  setUpcomingFixtures(fixtures || []);
-
   const { data: profile } = await supabase
     .from('profiles')
-    .select('username')
+    .select('username, fav_team, profile_pic')
     .eq('id', user.id)
     .single();
 
   setUsername(profile?.username || '');
+  setFavTeam(profile?.fav_team || '');
+  setProfilePic(profile?.profile_pic || null);
 };
 
 fetchData();
 
 }, [user]);
 
-const joinLeague = async () => { await supabase.rpc('join_league_by_code', { user_id_input: user.id, invite_code_input: inviteCode, }); setInviteCode(''); };
-
-const leaveLeague = async (leagueId) => { await supabase.from('league_members').delete().match({ user_id: user.id, league_id: leagueId }); setLeagues(leagues.filter((l) => l.id !== leagueId)); };
-
-const createLeague = async () => { setError(''); setSuccessMessage(''); if (!newLeagueName.trim()) { setError('Please enter a league name.'); return; }
-
-const { data, error } = await supabase
-  .from('leagues')
-  .insert([{ name: newLeagueName, is_public: false, invite_code: null, creator_id: user.id }])
-  .select()
-  .single();
+const updateProfile = async () => { setProfileMessage(''); if (!username.trim()) { setProfileMessage('Username cannot be empty.'); return; } const { error } = await supabase .from('profiles') .update({ username: username.trim(), fav_team: favTeam, profile_pic: profilePic }) .eq('id', user.id);
 
 if (error) {
-  setError('Failed to create league.');
   console.error(error);
-  return;
+  setProfileMessage('Failed to update profile.');
+} else {
+  setProfileMessage('Profile updated successfully.');
 }
-
-const newLeague = data;
-
-const { error: memberError } = await supabase
-  .from('league_members')
-  .insert([{ league_id: newLeague.id, user_id: user.id }]);
-
-if (memberError) {
-  setError('League created, but failed to join.');
-  console.error(memberError);
-  return;
-}
-
-setNewLeagueName('');
-setSuccessMessage(`League "${newLeague.name}" created!`);
-setLeagues((prev) => [...prev, newLeague]);
 
 };
 
-const updateUsername = async () => { setProfileMessage(''); if (!username.trim()) { setProfileMessage('Username cannot be empty.'); return; } const { error } = await supabase .from('profiles') .update({ username: username.trim() }) .eq('id', user.id);
+const handleFileChange = async (e) => { const file = e.target.files[0]; if (!file) return;
+
+const { data, error } = await supabase.storage.from('avatars').upload(`${user.id}/avatar.png`, file, {
+  upsert: true,
+});
 
 if (error) {
-  console.error(error);
-  setProfileMessage('Failed to update username.');
+  console.error('Upload error:', error);
 } else {
-  setProfileMessage('Username updated successfully.');
+  const publicUrl = supabase.storage.from('avatars').getPublicUrl(`${user.id}/avatar.png`).data.publicUrl;
+  setProfilePic(publicUrl);
 }
 
 };
 
 if (!user) return <p className="p-4">Loading...</p>;
 
-return ( <div className="p-4 max-w-3xl mx-auto"> <h1 className="text-2xl font-bold mb-1">Welcome!</h1> <p className="mb-2 text-xs text-gray-400">User ID: {user.id}</p> <p className="mb-4">Total Points: <strong>{points}</strong></p>
+return ( <div className="p-4 max-w-3xl mx-auto mt-6"> <h1 className="text-2xl font-bold mb-4">Your Profile</h1>
 
-<div className="mb-6 border p-4 rounded bg-gray-50">
-    <h3 className="font-semibold mb-2">Update Profile</h3>
+{profilePic && (
+    <img src={profilePic} alt="Profile" className="w-24 h-24 rounded-full mb-4 object-cover" />
+  )}
+  <div className="mb-4">
+    <label className="block text-sm font-medium">Profile Picture</label>
+    <input type="file" accept="image/*" onChange={handleFileChange} className="mt-1" />
+  </div>
+
+  <div className="mb-4">
+    <label className="block text-sm font-medium">Username</label>
     <input
       type="text"
       value={username}
       onChange={(e) => setUsername(e.target.value)}
-      className="border px-2 py-1 mr-2"
-      placeholder="Enter username"
+      className="border px-2 py-1 w-full"
     />
-    <button onClick={updateUsername} className="bg-blue-500 text-white px-4 py-1 rounded">
-      Save
-    </button>
-    {profileMessage && <p className="text-sm mt-2">{profileMessage}</p>}
   </div>
 
-  <h2 className="text-xl font-semibold mt-6 mb-2">Your Leagues</h2>
-  <ul className="mb-4">
-    {leagues.map((league) => (
-      <li key={league.id} className="flex justify-between items-center border-b py-2">
-        <div>
-          <Link href={`/league/${league.id}`} className="text-blue-600 underline hover:text-blue-800">
-            {league.name}
-          </Link>
-          {!league.is_public && league.invite_code && (
-            <span className="ml-2 text-xs text-gray-500">Invite Code: {league.invite_code}</span>
-          )}
-        </div>
-        <button onClick={() => leaveLeague(league.id)} className="text-red-500 text-sm">
-          Leave
-        </button>
-      </li>
-    ))}
-  </ul>
-
-  <div className="mb-6">
+  <div className="mb-4">
+    <label className="block text-sm font-medium">Favourite Team</label>
     <input
       type="text"
-      value={inviteCode}
-      onChange={(e) => setInviteCode(e.target.value)}
-      placeholder="Enter invite code"
-      className="border px-2 py-1 mr-2"
+      value={favTeam}
+      onChange={(e) => setFavTeam(e.target.value)}
+      className="border px-2 py-1 w-full"
     />
-    <button onClick={joinLeague} className="bg-blue-500 text-white px-4 py-1 rounded">
-      Join
-    </button>
   </div>
 
-  <div className="mb-6 border p-4 rounded bg-gray-100 dark:bg-gray-800">
-    <h3 className="text-lg font-semibold mb-2">Create New League</h3>
-    {successMessage && <p className="text-green-600 mb-2">{successMessage}</p>}
-    {error && <p className="text-red-600 mb-2">{error}</p>}
-    <input
-      type="text"
-      value={newLeagueName}
-      onChange={(e) => setNewLeagueName(e.target.value)}
-      placeholder="League name"
-      className="border px-2 py-1 w-full mb-2 text-black"
-    />
+  <div className="mb-4">
     <button
-      onClick={createLeague}
-      className="bg-green-600 text-white px-4 py-2 rounded w-full"
+      onClick={updateProfile}
+      className="bg-blue-500 text-white px-4 py-2 rounded"
     >
-      Create League
+      Save Changes
     </button>
   </div>
 
-  <h2 className="text-xl font-semibold mt-6 mb-2">Recent Results</h2>
-  <ul className="mb-6">
-    {recentResults.map((result, index) => (
-      <li key={index} className="text-sm border-b py-2">
-        {result.fixtures.home_team} {result.predicted_home_score}–{result.predicted_away_score} vs actual {result.fixtures.actual_home_score}–{result.fixtures.actual_away_score} {result.fixtures.away_team}
-      </li>
-    ))}
-  </ul>
+  {profileMessage && <p className="text-sm mt-2">{profileMessage}</p>}
 
-  <h2 className="text-xl font-semibold mt-6 mb-2">Upcoming Fixtures</h2>
-  <ul className="mb-6">
-    {upcomingFixtures.map((f) => (
-      <li key={f.id} className="text-sm border-b py-2">
-        {f.home_team} vs {f.away_team} — {new Date(f.match_date).toLocaleString()}
-      </li>
-    ))}
-  </ul>
-
-  <Link href="/predictions" className="block text-center bg-blue-700 text-white px-4 py-2 rounded">
-    Go to Predictions
-  </Link>
+  <div className="mt-6">
+    <Link href="/dashboard" className="text-blue-600 underline hover:text-blue-800">
+      Back to Dashboard
+    </Link>
+  </div>
 </div>
 
 ); }
