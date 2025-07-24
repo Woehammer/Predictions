@@ -5,7 +5,7 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <nav className="sticky top-0 z-50 bg-white dark:bg-gray-900 shadow-md">
+    <nav className="sticky top-0 z-50 bg-gray-900 shadow-md text-white">
       <div className="max-w-6xl mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           {/* Site Name */}
