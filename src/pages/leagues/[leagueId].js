@@ -24,10 +24,10 @@ export default function LeaguePage() {
     const { data, error } = await supabase
       .from('league_members')
       .select(`
-        user_id,
-        profiles:profiles!id(id, username),
-        user_points:user_points(user_id, total_points)
-      `)
+  user_id,
+  profiles ( id, username ),
+  user_points ( total_points )
+`)
       .eq('league_id', leagueId);
 
     if (error) {
