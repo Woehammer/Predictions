@@ -1,6 +1,18 @@
 import Link from 'next/link';
+import { useEffect } from 'react';
+import { useSession } from '@supabase/auth-helpers-react';
+import { useRouter } from 'next/router';
 
 export default function Home() {
+  const session = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (session?.user) {
+      router.push('/dashboard');
+    }
+  }, [session, router]);
+
   return (
     <div className="min-h-screen bg-white text-gray-900 flex flex-col">
       {/* Header */}
@@ -10,8 +22,8 @@ export default function Home() {
           <h1 className="text-2xl font-bold text-yellow-500">Predictify</h1>
         </div>
         <nav className="space-x-4">
-          <Link href="/auth/login" className="text-gray-700 hover:text-yellow-500">Login</Link>
-          <Link href="/auth/signup" className="text-yellow-500 font-semibold hover:underline">Sign Up</Link>
+          <Link href="/auth" className="text-gray-700 hover:text-yellow-500">Login</Link>
+          <Link href="/auth" className="text-yellow-500 font-semibold hover:underline">Sign Up</Link>
         </nav>
       </header>
 
@@ -23,7 +35,7 @@ export default function Home() {
         <p className="text-lg mb-6 text-gray-600">
           Join Predictify today and test your football knowledge in leagues with your mates.
         </p>
-        <Link href="/auth/signup">
+        <Link href="/auth">
           <button className="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold px-6 py-3 rounded-xl transition">
             Get Started
           </button>
@@ -54,4 +66,4 @@ export default function Home() {
       </footer>
     </div>
   );
-        }
+}
