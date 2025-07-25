@@ -156,7 +156,7 @@ export default function UserDashboard() {
     <div
   className="min-h-screen bg-[url('/stadium-bg_20250725_183319_0000.jpg')] bg-cover bg-center text-white"
 >
-      <div className="bg-black bg-opacity-70 min-h-screen p-4 max-w-3xl mx-auto">
+      <div className="bg-black bg-opacity-30 min-h-screen p-4 max-w-3xl mx-auto">
         <h1 className="text-2xl font-bold mb-1">Welcome, {username || 'User'}!</h1>
         <p className="mb-4">Total Points: <strong>{points}</strong></p>
 
