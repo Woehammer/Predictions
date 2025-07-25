@@ -221,11 +221,18 @@ return ( <div className="p-4 max-w-3xl mx-auto"> <div className="my-4 flex justi
   </div>
 
   <h2 className="text-xl font-semibold mt-6 mb-2">Public Leagues</h2>
-  <ul className="mb-6">
-    {publicLeagues.map((league) => (
-      <li key={league.id} className="border-b py-2">{league.name}</li>
-    ))}
-  </ul>
+<ul className="mb-6">
+  {publicLeagues.map((league) => (
+    <li key={league.id} className="border-b py-2">
+      <Link
+        href={`/leagues/${league.id}`}
+        className="text-blue-500 underline hover:text-blue-700"
+      >
+        {league.name}
+      </Link>
+    </li>
+  ))}
+</ul>
 
   <h2 className="text-xl font-semibold mt-6 mb-2">Recent Results</h2>
   <ul className="mb-6">
