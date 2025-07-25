@@ -120,10 +120,30 @@ return ( <div className="p-4 max-w-4xl mx-auto"> <h1 className="text-2xl font-bo
         {members.map((m, i) => {
           const diff = m.week_score - m.last_week_score;
           const diffColor = diff > 0 ? 'text-green-600' : diff < 0 ? 'text-red-500' : 'text-gray-400';
+          const stats = userStats[m.user_id];
           return (
             <tr key={m.user_id} className={`border-t ${user?.id === m.user_id ? 'bg-yellow-100 dark:bg-yellow-900' : ''}`}>
               <td className="px-4 py-2">{i + 1}</td>
-              <td className="px-4 py-2">{m.username}</td>
+              <td className="px-4 py-2 relative group">
+                {m.username}
+                {stats && (
+                  <div className="absolute z-10 top-full left-0 mt-1 w-64 bg-white dark:bg-gray-800 shadow-md border rounded p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
+                    <p className="font-semibold mb-1">{m.username}</p>
+                    <p>Total Score: {stats.total_score}</p>
+                    <p>Exact Scores: {stats.exact_predictions}</p>
+                    <p>Bonus Avg: {parseFloat(stats.avg_bonus_score || 0).toFixed(2)}</p>
+                    <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
+                      Accuracy:
+                      <br />
+                      - Exact: {getPercent(stats.exact_count, stats.total_predictions)}%
+                      <br />
+                      - Winner: {getPercent(stats.winner_count, stats.total_predictions)}%
+                      <br />
+                      - Wrong: {getPercent(stats.wrong_count, stats.total_predictions)}%
+                    </p>
+                  </div>
+                )}
+              </td>
               <td className="px-4 py-2 text-center">{m.overall_score}</td>
               <td className="px-4 py-2 text-center">{m.month_score}</td>
               <td className="px-4 py-2 text-center">
@@ -143,10 +163,30 @@ return ( <div className="p-4 max-w-4xl mx-auto"> <h1 className="text-2xl font-bo
       const diffColor = diff > 0 ? 'text-green-600' : diff < 0 ? 'text-red-500' : 'text-gray-400';
       return (
         <div key={m.user_id} className="border rounded p-3 shadow-sm bg-white dark:bg-gray-800">
-          <div className="flex justify-between font-bold">
-            <span>{i + 1}. {m.username}</span>
-            <span className="text-blue-600">{m.overall_score} pts</span>
-          </div>
+          <details>
+            <summary className="flex justify-between font-bold cursor-pointer">
+              <span>{i + 1}. {m.username}</span>
+              <span className="text-blue-600">{m.overall_score} pts</span>
+            </summary>
+            <div className="mt-1 text-sm text-gray-700 dark:text-gray-300">
+              <div>This Month: {m.month_score}</div>
+              <div>This Week: {m.week_score} <span className={diffColor}>({diff > 0 ? '+' : ''}{diff})</span></div>
+              {userStats[m.user_id] && (
+                <div className="mt-2">
+                  <p>Total Score: {userStats[m.user_id].total_score}</p>
+                  <p>Exact Scores: {userStats[m.user_id].exact_predictions}</p>
+                  <p>Bonus Avg: {parseFloat(userStats[m.user_id].avg_bonus_score || 0).toFixed(2)}</p>
+                  <p className="mt-1">
+                    Accuracy:
+                    <br />- Exact: {getPercent(userStats[m.user_id].exact_count, userStats[m.user_id].total_predictions)}%
+                    <br />- Winner: {getPercent(userStats[m.user_id].winner_count, userStats[m.user_id].total_predictions)}%
+                    <br />- Wrong: {getPercent(userStats[m.user_id].wrong_count, userStats[m.user_id].total_predictions)}%
+                  </p>
+                </div>
+              )}
+            </div>
+          </details>
+        </div>
           <div className="mt-1 text-sm text-gray-700 dark:text-gray-300">
             <div>This Month: {m.month_score}</div>
             <div>This Week: {m.week_score} <span className={diffColor}>({diff > 0 ? '+' : ''}{diff})</span></div>
