@@ -25,13 +25,61 @@ export default function LeaguePage() {
   }, [leagueId]);
 
   const fetchLeaderboard = async () => {
-    const { data, error } = await supabase
-      .from('league_scores_view')
-      .select('user_id, username, overall_score, month_score, week_score, last_week_score')
-      .eq('league_id', leagueId)
-      .order('overall_score', { ascending: false });
+    // 1. Get all league members
+    const { data: leagueMembers, error: memberError } = await supabase
+      .from('league_members')
+      .select('user_id')
+      .eq('league_id', leagueId);
 
-    if (!error) setMembers(data);
+    if (memberError) {
+      console.error('Error fetching league members:', memberError);
+      return;
+    }
+
+    const userIds = leagueMembers.map((m) => m.user_id);
+
+    // 2. Get usernames
+    const { data: profiles, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, username')
+      .in('id', userIds);
+
+    // 3. Get scores
+    const { data: scores, error: scoreError } = await supabase
+      .from('league_scores_view')
+      .select('*')
+      .eq('league_id', leagueId);
+
+    const scoresById = {};
+    for (const s of scores || []) {
+      scoresById[s.user_id] = s;
+    }
+
+    // 4. Merge profiles with score data
+    const combined = profiles.map((p) => {
+      const s = scoresById[p.id] || {
+        overall_score: 0,
+        month_score: 0,
+        week_score: 0,
+        last_week_score: 0,
+      };
+      return {
+        user_id: p.id,
+        username: p.username,
+        ...s,
+      };
+    });
+
+    const sorted = combined.sort((a, b) => b.overall_score - a.overall_score);
+    setMembers(sorted);
+
+    const { data: leagueData } = await supabase
+      .from('leagues')
+      .select('name')
+      .eq('id', leagueId)
+      .single();
+
+    if (leagueData) setLeagueName(leagueData.name);
   };
 
   const fetchUserStats = async () => {
@@ -128,7 +176,7 @@ export default function LeaguePage() {
                   >
                     <td className="px-4 py-2">{i + 1}</td>
 
-                    {/* Username with hover card */}
+                    {/* Hover Card */}
                     <td className="px-4 py-2 relative group">
                       {m.username}
                       {stats && (
@@ -212,4 +260,4 @@ export default function LeaguePage() {
       </div>
     </div>
   );
-    }
+}
