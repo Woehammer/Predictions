@@ -229,9 +229,13 @@ export default function UserDashboard() {
           ))}
         </ul>
 
-        <Link href="/predictions" className="block text-center bg-blue-700 text-white px-4 py-2 rounded">
-          Go to Predictions
-        </Link>
+        <Link href="/predictions">
+  <img
+    src="/prediction-button_20250725_195023_0000.png"
+    alt="Go to Predictions"
+    className="w-48 sm:w-64 mx-auto my-6 hover:scale-105 transition-transform duration-200"
+  />
+</Link>
       </div>
     </div>
   );
