@@ -181,7 +181,7 @@ return ( <div className="min-h-screen bg-[url('/stadium-bg_20250725_183319_0000.
       />
       <button onClick={createLeague} className="w-full">
         <img
-          src="/createleague-button_20250725_200715_0000~2.png"
+          src="/public/createleague-button_20250725_200715_0000.png"
           alt="Create League"
           className="w-full max-w-xs mx-auto hover:scale-105 transition-transform duration-200"
         />
