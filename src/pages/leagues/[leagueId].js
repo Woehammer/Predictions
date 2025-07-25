@@ -147,7 +147,8 @@ return ( <div className="p-4 max-w-4xl mx-auto"> <h1 className="text-2xl font-bo
               <td className="px-4 py-2 text-center">{m.overall_score}</td>
               <td className="px-4 py-2 text-center">{m.month_score}</td>
               <td className="px-4 py-2 text-center">
-                {m.week_score} <span className={`text-sm ${diffColor}`}>({diff > 0 ? '+' : ''}{diff})</span>
+                {m.week_score}{' '}
+                <span className={`text-sm ${diffColor}`}>({diff > 0 ? '+' : ''}{diff})</span>
               </td>
             </tr>
           );
@@ -187,11 +188,6 @@ return ( <div className="p-4 max-w-4xl mx-auto"> <h1 className="text-2xl font-bo
             </div>
           </details>
         </div>
-          <div className="mt-1 text-sm text-gray-700 dark:text-gray-300">
-            <div>This Month: {m.month_score}</div>
-            <div>This Week: {m.week_score} <span className={diffColor}>({diff > 0 ? '+' : ''}{diff})</span></div>
-          </div>
-        </div>
       );
     })}
   </div>
@@ -203,15 +199,16 @@ return ( <div className="p-4 max-w-4xl mx-auto"> <h1 className="text-2xl font-bo
     <ul className="mb-6 border rounded divide-y">
       {honours.map((h, i) => (
         <li key={i} className="px-4 py-2">
+          <div className="flex justify-between w-full">
+            <span className="font-medium">{h.month_label.trim()}</span>
+            <span>{h.username} ({h.month_points} pts)</span>
+          </div>
+        </li>
+      ))}
+    </ul>
+  )}
 
-  <div className="flex justify-between w-full">
-    <span className="font-medium">{h.month_label.trim()}</span>
-    <span>{h.username} ({h.month_points} pts)</span>
-  </div>
-</li>
-          ))}
-        </ul>
-      )}<h2 className="text-xl font-semibold mb-2">Chat</h2>
+  <h2 className="text-xl font-semibold mb-2">Chat</h2>
   <div className="border rounded h-64 overflow-y-auto p-2 mb-2 bg-white dark:bg-gray-900">
     {messages.map((msg, idx) => (
       <div key={idx} className="mb-1">
