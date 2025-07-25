@@ -12,11 +12,13 @@ export default function LeaguePage() {
   const [leagueName, setLeagueName] = useState('');
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
+  const [honours, setHonours] = useState([]);
 
   useEffect(() => {
     if (leagueId) {
       fetchLeaderboard();
       fetchMessages();
+      fetchHonours();
     }
   }, [leagueId]);
 
@@ -43,20 +45,6 @@ export default function LeaguePage() {
     if (!leagueError) setLeagueName(leagueData?.name || '');
   };
 
-  <h2 className="text-xl font-semibold mb-2">Roll of Honour</h2>
-{honours.length === 0 ? (
-  <p className="text-gray-500 mb-6">No monthly winners yet.</p>
-) : (
-  <ul className="mb-6 border rounded divide-y">
-    {honours.map((h, i) => (
-      <li key={i} className="flex justify-between px-4 py-2">
-        <span className="font-medium">{h.month_label.trim()}</span>
-        <span>{h.username} ({h.month_points} pts)</span>
-      </li>
-    ))}
-  </ul>
-)}
-
   const fetchMessages = async () => {
     const { data, error } = await supabase
       .from('league_messages')
@@ -71,6 +59,21 @@ export default function LeaguePage() {
 
     if (error) console.error('Message fetch error:', error);
     else setMessages(data);
+  };
+
+  const fetchHonours = async () => {
+    const { data, error } = await supabase
+      .from('monthly_honours_view')
+      .select('month_label, username, month_points')
+      .eq('league_id', leagueId)
+      .order('month_start', { ascending: false })
+      .limit(6);
+
+    if (error) {
+      console.error('Honours fetch error:', error);
+    } else {
+      setHonours(data);
+    }
   };
 
   const sendMessage = async () => {
@@ -96,6 +99,7 @@ export default function LeaguePage() {
     <div className="p-4 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">League: {leagueName || 'Loading...'}</h1>
 
+      {/* Leaderboard Section */}
       <h2 className="text-xl font-semibold mb-2">Leaderboard</h2>
       {members.length === 0 ? (
         <p className="text-gray-500 mb-4">No members found.</p>
@@ -148,6 +152,22 @@ export default function LeaguePage() {
         </div>
       )}
 
+      {/* Roll of Honour Section */}
+      <h2 className="text-xl font-semibold mb-2">Roll of Honour</h2>
+      {honours.length === 0 ? (
+        <p className="text-gray-500 mb-6">No monthly winners yet.</p>
+      ) : (
+        <ul className="mb-6 border rounded divide-y">
+          {honours.map((h, i) => (
+            <li key={i} className="flex justify-between px-4 py-2">
+              <span className="font-medium">{h.month_label.trim()}</span>
+              <span>{h.username} ({h.month_points} pts)</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Chat Section */}
       <h2 className="text-xl font-semibold mb-2">Chat</h2>
       <div className="border rounded h-64 overflow-y-auto p-2 mb-2 bg-white dark:bg-gray-900">
         {messages.map((msg, idx) => (
@@ -176,4 +196,4 @@ export default function LeaguePage() {
       </div>
     </div>
   );
-  }
+}
