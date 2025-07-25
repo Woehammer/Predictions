@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'; import { supabase } from '@/lib/supabaseclient'; import Link from 'next/link'; import { useSession } from '@supabase/auth-helpers-react';
 
-export default function UserDashboard() { const session = useSession(); const user = session?.user;
+export default function UserDashboard() { import { useSessionContect } from '@supabase/auth-helpers-react';
+                                         const { session, isLoading } = useSessionContext();
+                                         const user = session?.user;
 
 const [points, setPoints] = useState(0); const [username, setUsername] = useState(''); const [leagues, setLeagues] = useState([]); const [publicLeagues, setPublicLeagues] = useState([]); const [inviteCode, setInviteCode] = useState(''); const [newLeagueName, setNewLeagueName] = useState(''); const [successMessage, setSuccessMessage] = useState(''); const [error, setError] = useState(''); const [recentResults, setRecentResults] = useState([]); const [upcomingFixtures, setUpcomingFixtures] = useState([]);
 
