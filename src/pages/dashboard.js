@@ -173,14 +173,22 @@ export default function UserDashboard() {
         </ul>
 
         <div className="mb-6">
-          <input
-            type="text"
-            value={inviteCode}
-            onChange={(e) => setInviteCode(e.target.value)}
-            placeholder="Enter invite code"
-            className="border px-2 py-1 mr-2 bg-white text-black"
-          />
-          <button onClick={joinLeague} className="bg-blue-600 text-white px-4 py-1 rounded">Join</button>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-6">
+  <input
+    type="text"
+    value={inviteCode}
+    onChange={(e) => setInviteCode(e.target.value)}
+    placeholder="Enter invite code"
+    className="border px-2 py-1 bg-white text-black flex-grow"
+  />
+  <button onClick={joinLeague}>
+    <img
+      src="/join-button_20250725_195612_0000.png"
+      alt="Join"
+      className="w-40 hover:scale-105 transition-transform duration-200"
+    />
+  </button>
+</div>
         </div>
 
         <div className="mb-6 border p-4 rounded bg-gray-900">
