@@ -6,7 +6,15 @@ export default function UserDashboard() { import { useSessionContect } from '@su
 
 const [points, setPoints] = useState(0); const [username, setUsername] = useState(''); const [leagues, setLeagues] = useState([]); const [publicLeagues, setPublicLeagues] = useState([]); const [inviteCode, setInviteCode] = useState(''); const [newLeagueName, setNewLeagueName] = useState(''); const [successMessage, setSuccessMessage] = useState(''); const [error, setError] = useState(''); const [recentResults, setRecentResults] = useState([]); const [upcomingFixtures, setUpcomingFixtures] = useState([]);
 
-useEffect(() => { if (!user) return;
+useEffect(() => { if (isLoading) return <p classname="p-4">Loading...</p>;
+                 if (!user) {
+                   // Optional redirect
+                   if (typeof window !== 'undefined')
+                   {
+                     window.location.href = '/auth';
+                   }
+                   return <p classname="p-4">Redirecting to login...</p>;
+                 }
 
 const fetchData = async () => {
   const { data: profile } = await supabase
