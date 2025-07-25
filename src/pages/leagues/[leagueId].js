@@ -13,12 +13,14 @@ export default function LeaguePage() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [honours, setHonours] = useState([]);
+  const [userStats, setUserStats] = useState({});
 
   useEffect(() => {
     if (leagueId) {
       fetchLeaderboard();
       fetchMessages();
       fetchHonours();
+      fetchUserStats();
     }
   }, [leagueId]);
 
@@ -29,36 +31,22 @@ export default function LeaguePage() {
       .eq('league_id', leagueId)
       .order('overall_score', { ascending: false });
 
-    if (error) {
-      console.error('Leaderboard error:', error);
-      return;
-    }
-
-    setMembers(data);
-
-    const { data: leagueData, error: leagueError } = await supabase
-      .from('leagues')
-      .select('name')
-      .eq('id', leagueId)
-      .single();
-
-    if (!leagueError) setLeagueName(leagueData?.name || '');
+    if (!error) setMembers(data);
   };
 
-  const fetchMessages = async () => {
+  const fetchUserStats = async () => {
     const { data, error } = await supabase
-      .from('league_messages')
-      .select(`
-        message,
-        created_at,
-        user_id,
-        profiles ( username )
-      `)
-      .eq('league_id', leagueId)
-      .order('created_at', { ascending: true });
+      .from('user_prediction_stats_view')
+      .select('*')
+      .eq('league_id', leagueId);
 
-    if (error) console.error('Message fetch error:', error);
-    else setMessages(data);
+    if (!error) {
+      const statMap = {};
+      for (const row of data) {
+        statMap[row.user_id] = row;
+      }
+      setUserStats(statMap);
+    }
   };
 
   const fetchHonours = async () => {
@@ -69,11 +57,17 @@ export default function LeaguePage() {
       .order('month_start', { ascending: false })
       .limit(6);
 
-    if (error) {
-      console.error('Honours fetch error:', error);
-    } else {
-      setHonours(data);
-    }
+    if (!error) setHonours(data);
+  };
+
+  const fetchMessages = async () => {
+    const { data, error } = await supabase
+      .from('league_messages')
+      .select('message, created_at, user_id, profiles ( username )')
+      .eq('league_id', leagueId)
+      .order('created_at', { ascending: true });
+
+    if (!error) setMessages(data);
   };
 
   const sendMessage = async () => {
@@ -85,13 +79,16 @@ export default function LeaguePage() {
       message: newMessage.trim(),
     });
 
-    if (error) {
-      console.error('Send error:', error);
-    } else {
+    if (!error) {
       setNewMessage('');
       fetchMessages();
     }
   };
+
+  function getPercent(part, total) {
+    if (!total || total === 0) return 0;
+    return Math.round((part / total) * 100);
+  }
 
   if (!leagueId) return <p className="p-4">Loading...</p>;
 
@@ -99,7 +96,6 @@ export default function LeaguePage() {
     <div className="p-4 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">League: {leagueName || 'Loading...'}</h1>
 
-      {/* Leaderboard Section */}
       <h2 className="text-xl font-semibold mb-2">Leaderboard</h2>
       {members.length === 0 ? (
         <p className="text-gray-500 mb-4">No members found.</p>
@@ -119,21 +115,38 @@ export default function LeaguePage() {
               {members.map((m, i) => {
                 const diff = m.week_score - m.last_week_score;
                 const diffColor =
-                  diff > 0
-                    ? 'text-green-600'
-                    : diff < 0
-                    ? 'text-red-500'
-                    : 'text-gray-400';
+                  diff > 0 ? 'text-green-600' : diff < 0 ? 'text-red-500' : 'text-gray-400';
+                const stats = userStats[m.user_id];
 
                 return (
                   <tr
                     key={m.user_id}
-                    className={`border-t ${
-                      user?.id === m.user_id ? 'bg-yellow-100 dark:bg-yellow-900' : ''
-                    }`}
+                    className={`border-t ${user?.id === m.user_id ? 'bg-yellow-100 dark:bg-yellow-900' : ''}`}
                   >
                     <td className="px-4 py-2">{i + 1}</td>
-                    <td className="px-4 py-2">{m.username}</td>
+
+                    {/* Username with Hover Card */}
+                    <td className="px-4 py-2 relative group">
+                      {m.username}
+                      {stats && (
+                        <div className="absolute z-10 top-full left-0 mt-1 w-64 bg-white dark:bg-gray-800 shadow-md border rounded p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
+                          <p className="font-semibold mb-1">{m.username}</p>
+                          <p>Total Score: {stats.total_score}</p>
+                          <p>Exact Scores: {stats.exact_predictions}</p>
+                          <p>Bonus Avg: {parseFloat(stats.avg_bonus_score || 0).toFixed(2)}</p>
+                          <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
+                            Accuracy:
+                            <br />
+                            - Exact: {getPercent(stats.exact_count, stats.total_predictions)}%
+                            <br />
+                            - Winner: {getPercent(stats.winner_count, stats.total_predictions)}%
+                            <br />
+                            - Wrong: {getPercent(stats.wrong_count, stats.total_predictions)}%
+                          </p>
+                        </div>
+                      )}
+                    </td>
+
                     <td className="px-4 py-2 text-center">{m.overall_score}</td>
                     <td className="px-4 py-2 text-center">{m.month_score}</td>
                     <td className="px-4 py-2 text-center">
@@ -152,7 +165,6 @@ export default function LeaguePage() {
         </div>
       )}
 
-      {/* Roll of Honour Section */}
       <h2 className="text-xl font-semibold mb-2">Roll of Honour</h2>
       {honours.length === 0 ? (
         <p className="text-gray-500 mb-6">No monthly winners yet.</p>
@@ -167,7 +179,6 @@ export default function LeaguePage() {
         </ul>
       )}
 
-      {/* Chat Section */}
       <h2 className="text-xl font-semibold mb-2">Chat</h2>
       <div className="border rounded h-64 overflow-y-auto p-2 mb-2 bg-white dark:bg-gray-900">
         {messages.map((msg, idx) => (
@@ -196,4 +207,4 @@ export default function LeaguePage() {
       </div>
     </div>
   );
-}
+    }
