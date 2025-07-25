@@ -1,14 +1,22 @@
-// pages/leagues/[leagueId].js import React, { useEffect, useState } from 'react'; import { useUser } from '@supabase/auth-helpers-react'; import { useRouter } from 'next/router'; import { supabase } from '@/lib/supabaseclient';
+import React, { useEffect, useState } from 'react'; import { useUser } from '@supabase/auth-helpers-react'; import { useRouter } from 'next/router'; import { supabase } from '@/lib/supabaseclient';
 
 export default function LeaguePage() { const router = useRouter(); const { leagueId } = router.query; const user = useUser();
 
-const [members, setMembers] = useState([]); const [leagueName, setLeagueName] = useState(''); const [hasChat, setHasChat] = useState(true); const [messages, setMessages] = useState([]); const [newMessage, setNewMessage] = useState(''); const [honours, setHonours] = useState([]); const [userStats, setUserStats] = useState({});
+const [members, setMembers] = useState([]); const [leagueName, setLeagueName] = useState(''); const [messages, setMessages] = useState([]); const [newMessage, setNewMessage] = useState(''); const [honours, setHonours] = useState([]); const [userStats, setUserStats] = useState({}); const [hasChat, setHasChat] = useState(true); const [page, setPage] = useState(0); const pageSize = 50;
 
-const [currentPage, setCurrentPage] = useState(0); const itemsPerPage = 50;
+useEffect(() => { if (leagueId) { fetchLeaderboard(); fetchMessages(); fetchHonours(); fetchUserStats(); } }, [leagueId]);
 
-useEffect(() => { if (leagueId) { fetchLeaderboard(); fetchHonours(); fetchUserStats(); if (hasChat) fetchMessages(); } }, [leagueId]);
+const fetchLeaderboard = async () => { const { data: leagueData } = await supabase .from('leagues') .select('name, has_chat') .eq('id', leagueId) .single();
 
-const fetchLeaderboard = async () => { const { data: leagueMembers, error: memberError } = await supabase .from('league_members') .select('user_id') .eq('league_id', leagueId);
+if (leagueData) {
+  setLeagueName(leagueData.name);
+  setHasChat(leagueData.has_chat);
+}
+
+const { data: leagueMembers, error: memberError } = await supabase
+  .from('league_members')
+  .select('user_id')
+  .eq('league_id', leagueId);
 
 if (memberError) {
   console.error('Error fetching league members:', memberError);
@@ -49,17 +57,6 @@ const combined = profiles.map((p) => {
 const sorted = combined.sort((a, b) => b.overall_score - a.overall_score);
 setMembers(sorted);
 
-const { data: leagueData } = await supabase
-  .from('leagues')
-  .select('name, has_chat')
-  .eq('id', leagueId)
-  .single();
-
-if (leagueData) {
-  setLeagueName(leagueData.name);
-  setHasChat(leagueData.has_chat !== false);
-}
-
 };
 
 const fetchUserStats = async () => { const { data, error } = await supabase .from('user_prediction_stats_view') .select('*') .eq('league_id', leagueId);
@@ -80,7 +77,13 @@ if (!error) setHonours(data);
 
 };
 
-const fetchMessages = async () => { const { data, error } = await supabase .from('league_messages') .select('message, created_at, user_id, profiles ( username )') .eq('league_id', leagueId) .order('created_at', { ascending: true });
+const fetchMessages = async () => { if (!hasChat) return;
+
+const { data, error } = await supabase
+  .from('league_messages')
+  .select('message, created_at, user_id, profiles ( username )')
+  .eq('league_id', leagueId)
+  .order('created_at', { ascending: true });
 
 if (!error) setMessages(data);
 
@@ -105,32 +108,75 @@ function getPercent(part, total) { if (!total || total === 0) return 0; return M
 
 if (!leagueId) return <p className="p-4">Loading...</p>;
 
-const pageMembers = members.slice( currentPage * itemsPerPage, (currentPage + 1) * itemsPerPage );
+const pagedMembers = members.slice(page * pageSize, (page + 1) * pageSize);
 
 return ( <div className="p-4 max-w-4xl mx-auto"> <h1 className="text-2xl font-bold mb-4">League: {leagueName || 'Loading...'}</h1>
 
 <h2 className="text-xl font-semibold mb-2">Leaderboard</h2>
 
-  <div className="flex justify-between mt-2 mb-4">
-    <button
-      onClick={() => setCurrentPage((p) => Math.max(p - 1, 0))}
-      disabled={currentPage === 0}
-      className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-    >
-      Previous
-    </button>
-    <button
-      onClick={() => setCurrentPage((p) => (p + 1) * itemsPerPage < members.length ? p + 1 : p)}
-      disabled={(currentPage + 1) * itemsPerPage >= members.length}
-      className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-    >
-      Next
-    </button>
+  <div className="overflow-x-auto mb-4 border rounded">
+    <table className="min-w-full table-auto">
+      <thead className="bg-gray-100 dark:bg-gray-800">
+        <tr>
+          <th className="px-4 py-2 text-left">#</th>
+          <th className="px-4 py-2 text-left">Username</th>
+          <th className="px-4 py-2 text-center">Overall</th>
+          <th className="px-4 py-2 text-center">This Month</th>
+          <th className="px-4 py-2 text-center">This Week</th>
+        </tr>
+      </thead>
+      <tbody>
+        {pagedMembers.map((m, i) => {
+          const diff = m.week_score - m.last_week_score;
+          const diffColor = diff > 0 ? 'text-green-600' : diff < 0 ? 'text-red-500' : 'text-gray-400';
+          const stats = userStats[m.user_id];
+          return (
+            <tr key={m.user_id} className={`border-t ${user?.id === m.user_id ? 'bg-yellow-100 dark:bg-yellow-900' : ''}`}>
+              <td className="px-4 py-2">{i + 1 + page * pageSize}</td>
+              <td className="px-4 py-2 relative group">
+                {m.username}
+                {stats && (
+                  <div className="absolute z-10 top-full left-0 mt-1 w-64 bg-white dark:bg-gray-800 shadow-md border rounded p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
+                    <p className="font-semibold mb-1">{m.username}</p>
+                    <p>Total Score: {stats.total_score}</p>
+                    <p>Exact Scores: {stats.exact_predictions}</p>
+                    <p>Bonus Avg: {parseFloat(stats.avg_bonus_score || 0).toFixed(2)}</p>
+                    <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
+                      Accuracy:<br />
+                      - Exact: {getPercent(stats.exact_count, stats.total_predictions)}%<br />
+                      - Winner: {getPercent(stats.winner_count, stats.total_predictions)}%<br />
+                      - Wrong: {getPercent(stats.wrong_count, stats.total_predictions)}%
+                    </p>
+                  </div>
+                )}
+              </td>
+              <td className="px-4 py-2 text-center">{m.overall_score}</td>
+              <td className="px-4 py-2 text-center">{m.month_score}</td>
+              <td className="px-4 py-2 text-center">
+                {m.week_score} <span className={`text-sm ${diffColor}`}>({diff > 0 ? '+' : ''}{diff})</span>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   </div>
 
-  {/* Include your full table and mobile views here, but use pageMembers.map(...) instead of members.map(...) */}
+  {/* Pagination Controls */}
+  <div className="flex justify-between mb-6">
+    <button
+      onClick={() => setPage(p => Math.max(p - 1, 0))}
+      disabled={page === 0}
+      className="bg-gray-200 px-3 py-1 rounded disabled:opacity-50"
+    >Previous</button>
+    <button
+      onClick={() => setPage(p => (p + 1) * pageSize < members.length ? p + 1 : p)}
+      disabled={(page + 1) * pageSize >= members.length}
+      className="bg-gray-200 px-3 py-1 rounded disabled:opacity-50"
+    >Next</button>
+  </div>
 
-  <h2 className="text-xl font-semibold mb-2 mt-6">Roll of Honour</h2>
+  <h2 className="text-xl font-semibold mb-2">Roll of Honour</h2>
   {honours.length === 0 ? (
     <p className="text-gray-500 mb-6">No monthly winners yet.</p>
   ) : (
@@ -170,9 +216,7 @@ return ( <div className="p-4 max-w-4xl mx-auto"> <h1 className="text-2xl font-bo
         <button
           onClick={sendMessage}
           className="bg-blue-500 text-white px-4 py-1 rounded"
-        >
-          Send
-        </button>
+        >Send</button>
       </div>
     </>
   )}
