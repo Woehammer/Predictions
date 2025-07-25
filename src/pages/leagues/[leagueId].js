@@ -43,6 +43,20 @@ export default function LeaguePage() {
     if (!leagueError) setLeagueName(leagueData?.name || '');
   };
 
+  <h2 className="text-xl font-semibold mb-2">Roll of Honour</h2>
+{honours.length === 0 ? (
+  <p className="text-gray-500 mb-6">No monthly winners yet.</p>
+) : (
+  <ul className="mb-6 border rounded divide-y">
+    {honours.map((h, i) => (
+      <li key={i} className="flex justify-between px-4 py-2">
+        <span className="font-medium">{h.month_label.trim()}</span>
+        <span>{h.username} ({h.month_points} pts)</span>
+      </li>
+    ))}
+  </ul>
+)}
+
   const fetchMessages = async () => {
     const { data, error } = await supabase
       .from('league_messages')
