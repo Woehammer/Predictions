@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'; import { supabase } from '@/lib/sup
 
 export default function UserDashboard() { const { session, isLoading } = useSessionContext(); const user = session?.user;
 
-const [points, setPoints] = useState(0); const [username, setUsername] = useState(''); const [leagues, setLeagues] = useState([]); const [publicLeagues, setPublicLeagues] = useState([]); const [inviteCode, setInviteCode] = useState(''); const [newLeagueName, setNewLeagueName] = useState(''); const [successMessage, setSuccessMessage] = useState(''); const [error, setError] = useState(''); const [recentResults, setRecentResults] = useState([]); const [upcomingFixtures, setUpcomingFixtures] = useState([]);
+const [points, setPoints] = useState(0); const [username, setUsername] = useState(''); const [leagues, setLeagues] = useState([]); const [inviteCode, setInviteCode] = useState(''); const [newLeagueName, setNewLeagueName] = useState(''); const [successMessage, setSuccessMessage] = useState(''); const [error, setError] = useState(''); const [recentResults, setRecentResults] = useState([]); const [upcomingFixtures, setUpcomingFixtures] = useState([]);
 
 useEffect(() => { if (isLoading) return; if (!user) { if (typeof window !== 'undefined') { window.location.href = '/auth'; } return; }
 
@@ -15,19 +15,14 @@ const fetchData = async () => {
 
   setUsername(profile?.username || '');
 
-  const { data: memberships } = await supabase
-    .from('league_members')
-    .select('league_id')
-    .eq('user_id', user.id);
+  const { data: allLeagues, error: leaguesError } = await supabase
+    .rpc('get_user_and_public_leagues', { uid: user.id });
 
-  const leagueIds = memberships?.map((m) => m.league_id) || [];
-
-  const { data: userLeagues } = await supabase
-    .from('leagues')
-    .select('id, name, is_public, invite_code')
-    .in('id', leagueIds);
-
-  setLeagues(userLeagues || []);
+  if (leaguesError) {
+    console.error('Error fetching leagues:', leaguesError);
+  } else {
+    setLeagues(allLeagues || []);
+  }
 
   const { data: pointsData } = await supabase
     .from('user_points')
@@ -36,13 +31,6 @@ const fetchData = async () => {
     .single();
 
   setPoints(pointsData?.total_points || 0);
-
-  const { data: publicData } = await supabase
-    .from('leagues')
-    .select()
-    .eq('is_public', true);
-
-  setPublicLeagues(publicData || []);
 
   const { data: results } = await supabase
     .from('predictions')
@@ -112,9 +100,7 @@ setSuccessMessage('Successfully joined the league!');
 setInviteCode('');
 
 const { data: updatedLeagues } = await supabase
-  .from('leagues')
-  .select('id, name, is_public, invite_code')
-  .in('id', [...leagues.map((l) => l.id), league.id]);
+  .rpc('get_user_and_public_leagues', { uid: user.id });
 
 setLeagues(updatedLeagues || []);
 
@@ -190,7 +176,9 @@ return ( <div className="p-4 max-w-3xl mx-auto"> <div className="my-4 flex justi
             <span className="ml-2 text-xs text-gray-400">Invite Code: {league.invite_code}</span>
           )}
         </div>
-        <button onClick={() => leaveLeague(league.id)} className="text-red-500 text-sm">Leave</button>
+        {!league.is_public && (
+          <button onClick={() => leaveLeague(league.id)} className="text-red-500 text-sm">Leave</button>
+        )}
       </li>
     ))}
   </ul>
@@ -219,20 +207,6 @@ return ( <div className="p-4 max-w-3xl mx-auto"> <div className="my-4 flex justi
     />
     <button onClick={createLeague} className="bg-green-600 text-white px-4 py-2 rounded w-full">Create League</button>
   </div>
-
-  <h2 className="text-xl font-semibold mt-6 mb-2">Public Leagues</h2>
-<ul className="mb-6">
-  {publicLeagues.map((league) => (
-    <li key={league.id} className="border-b py-2">
-      <Link
-        href={`/leagues/${league.id}`}
-        className="text-blue-500 underline hover:text-blue-700"
-      >
-        {league.name}
-      </Link>
-    </li>
-  ))}
-</ul>
 
   <h2 className="text-xl font-semibold mt-6 mb-2">Recent Results</h2>
   <ul className="mb-6">
