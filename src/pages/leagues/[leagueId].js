@@ -96,11 +96,12 @@ export default function LeaguePage() {
     <div className="p-4 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">League: {leagueName || 'Loading...'}</h1>
 
+      {/* Leaderboard */}
       <h2 className="text-xl font-semibold mb-2">Leaderboard</h2>
       {members.length === 0 ? (
         <p className="text-gray-500 mb-4">No members found.</p>
       ) : (
-        <div className="mb-6 border rounded overflow-x-auto">
+        <div className="mb-6 border rounded">
           <table className="min-w-full table-auto">
             <thead className="bg-gray-100 dark:bg-gray-800">
               <tr>
@@ -121,11 +122,13 @@ export default function LeaguePage() {
                 return (
                   <tr
                     key={m.user_id}
-                    className={`border-t ${user?.id === m.user_id ? 'bg-yellow-100 dark:bg-yellow-900' : ''}`}
+                    className={`border-t ${
+                      user?.id === m.user_id ? 'bg-yellow-100 dark:bg-yellow-900' : ''
+                    }`}
                   >
                     <td className="px-4 py-2">{i + 1}</td>
 
-                    {/* Username with Hover Card */}
+                    {/* Username with hover card */}
                     <td className="px-4 py-2 relative group">
                       {m.username}
                       {stats && (
@@ -165,6 +168,7 @@ export default function LeaguePage() {
         </div>
       )}
 
+      {/* Roll of Honour */}
       <h2 className="text-xl font-semibold mb-2">Roll of Honour</h2>
       {honours.length === 0 ? (
         <p className="text-gray-500 mb-6">No monthly winners yet.</p>
@@ -179,6 +183,7 @@ export default function LeaguePage() {
         </ul>
       )}
 
+      {/* Chat */}
       <h2 className="text-xl font-semibold mb-2">Chat</h2>
       <div className="border rounded h-64 overflow-y-auto p-2 mb-2 bg-white dark:bg-gray-900">
         {messages.map((msg, idx) => (
