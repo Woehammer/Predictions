@@ -1,20 +1,10 @@
-import { useEffect, useState } from 'react'; import { supabase } from '@/lib/supabaseclient'; import Link from 'next/link'; import { useSession } from '@supabase/auth-helpers-react';
+import { useEffect, useState } from 'react'; import { supabase } from '@/lib/supabaseclient'; import Link from 'next/link'; import { useSessionContext } from '@supabase/auth-helpers-react';
 
-export default function UserDashboard() { import { useSessionContect } from '@supabase/auth-helpers-react';
-                                         const { session, isLoading } = useSessionContext();
-                                         const user = session?.user;
+export default function UserDashboard() { const { session, isLoading } = useSessionContext(); const user = session?.user;
 
 const [points, setPoints] = useState(0); const [username, setUsername] = useState(''); const [leagues, setLeagues] = useState([]); const [publicLeagues, setPublicLeagues] = useState([]); const [inviteCode, setInviteCode] = useState(''); const [newLeagueName, setNewLeagueName] = useState(''); const [successMessage, setSuccessMessage] = useState(''); const [error, setError] = useState(''); const [recentResults, setRecentResults] = useState([]); const [upcomingFixtures, setUpcomingFixtures] = useState([]);
 
-useEffect(() => { if (isLoading) return <p classname="p-4">Loading...</p>;
-                 if (!user) {
-                   // Optional redirect
-                   if (typeof window !== 'undefined')
-                   {
-                     window.location.href = '/auth';
-                   }
-                   return <p classname="p-4">Redirecting to login...</p>;
-                 }
+useEffect(() => { if (isLoading) return; if (!user) { if (typeof window !== 'undefined') { window.location.href = '/auth'; } return; }
 
 const fetchData = async () => {
   const { data: profile } = await supabase
@@ -82,7 +72,7 @@ try {
   console.error('Adsense error', e);
 }
 
-}, [user]);
+}, [user, isLoading]);
 
 const joinLeague = async () => { if (!inviteCode.trim()) return;
 
@@ -175,7 +165,7 @@ setLeagues((prev) => [...prev, newLeague]);
 
 if (!user) return <p className="p-4">Loading...</p>;
 
-return ( <div className="p-4 max-w-3xl mx-auto"> {/* Google AdSense Ad */} <div className="my-4 flex justify-center"> <ins className="adsbygoogle" style={{ display: 'block' }} data-ad-client="ca-pub-7482718612741631" data-ad-slot="1234567890" data-ad-format="auto" data-full-width-responsive="true"></ins> </div>
+return ( <div className="p-4 max-w-3xl mx-auto"> <div className="my-4 flex justify-center"> <ins className="adsbygoogle" style={{ display: 'block' }} data-ad-client="ca-pub-7482718612741631" data-ad-slot="1234567890" data-ad-format="auto" data-full-width-responsive="true" ></ins> </div>
 
 <h1 className="text-2xl font-bold mb-1">Welcome, {username || 'User'}!</h1>
   <p className="mb-4">Total Points: <strong>{points}</strong></p>
