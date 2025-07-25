@@ -21,40 +21,18 @@ export default function LeaguePage() {
   }, [leagueId]);
 
   const fetchLeaderboard = async () => {
-    const { data: leagueMembers, error } = await supabase
-      .from('league_members')
-      .select('user_id')
-      .eq('league_id', leagueId);
+    const { data, error } = await supabase
+      .from('league_scores_view')
+      .select('user_id, username, overall_score, month_score, week_score, last_week_score')
+      .eq('league_id', leagueId)
+      .order('overall_score', { ascending: false });
 
     if (error) {
-      console.error('LeagueMembers error:', error);
+      console.error('Leaderboard error:', error);
       return;
     }
 
-    const userIds = leagueMembers.map((m) => m.user_id);
-
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, username')
-      .in('id', userIds);
-
-    const { data: points } = await supabase
-      .from('user_points')
-      .select('user_id, total_points')
-      .in('user_id', userIds);
-
-    const combined = leagueMembers.map((m) => {
-      const profile = profiles?.find((p) => p.id === m.user_id);
-      const point = points?.find((p) => p.user_id === m.user_id);
-      return {
-        user_id: m.user_id,
-        username: profile?.username ?? m.user_id.slice(0, 6),
-        total_points: point?.total_points ?? 0,
-      };
-    });
-
-    const sorted = combined.sort((a, b) => b.total_points - a.total_points);
-    setMembers(sorted);
+    setMembers(data);
 
     const { data: leagueData, error: leagueError } = await supabase
       .from('leagues')
@@ -101,35 +79,66 @@ export default function LeaguePage() {
   if (!leagueId) return <p className="p-4">Loading...</p>;
 
   return (
-    <div className="p-4 max-w-3xl mx-auto">
+    <div className="p-4 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">League: {leagueName || 'Loading...'}</h1>
 
       <h2 className="text-xl font-semibold mb-2">Leaderboard</h2>
       {members.length === 0 ? (
         <p className="text-gray-500 mb-4">No members found.</p>
       ) : (
-        <ul className="mb-6 border rounded">
-          {members.map((m, i) => (
-            <li
-              key={m.user_id}
-              className="border-b px-4 py-2 flex justify-between items-center"
-            >
-              <span>
-                {i + 1}. {m.username}
-              </span>
-              <span className="text-blue-600 font-semibold">
-                {m.total_points} pts
-              </span>
-            </li>
-          ))}
-        </ul>
+        <div className="mb-6 border rounded overflow-x-auto">
+          <table className="min-w-full table-auto">
+            <thead className="bg-gray-100 dark:bg-gray-800">
+              <tr>
+                <th className="px-4 py-2 text-left">#</th>
+                <th className="px-4 py-2 text-left">Username</th>
+                <th className="px-4 py-2 text-center">Overall</th>
+                <th className="px-4 py-2 text-center">This Month</th>
+                <th className="px-4 py-2 text-center">This Week</th>
+              </tr>
+            </thead>
+            <tbody>
+              {members.map((m, i) => {
+                const diff = m.week_score - m.last_week_score;
+                const diffColor =
+                  diff > 0
+                    ? 'text-green-600'
+                    : diff < 0
+                    ? 'text-red-500'
+                    : 'text-gray-400';
+
+                return (
+                  <tr
+                    key={m.user_id}
+                    className={`border-t ${
+                      user?.id === m.user_id ? 'bg-yellow-100 dark:bg-yellow-900' : ''
+                    }`}
+                  >
+                    <td className="px-4 py-2">{i + 1}</td>
+                    <td className="px-4 py-2">{m.username}</td>
+                    <td className="px-4 py-2 text-center">{m.overall_score}</td>
+                    <td className="px-4 py-2 text-center">{m.month_score}</td>
+                    <td className="px-4 py-2 text-center">
+                      <span title={`Last week: ${m.last_week_score}`}>
+                        {m.week_score}{' '}
+                        <span className={`text-sm ${diffColor}`}>
+                          ({diff > 0 ? '+' : ''}{diff})
+                        </span>
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
 
       <h2 className="text-xl font-semibold mb-2">Chat</h2>
-      <div className="border rounded h-64 overflow-y-auto p-2 mb-2 bg-white">
+      <div className="border rounded h-64 overflow-y-auto p-2 mb-2 bg-white dark:bg-gray-900">
         {messages.map((msg, idx) => (
           <div key={idx} className="mb-1">
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-gray-600 dark:text-gray-400">
               {msg.profiles?.username || msg.user_id.slice(0, 6)}:
             </span>{' '}
             <span>{msg.message}</span>
@@ -153,4 +162,4 @@ export default function LeaguePage() {
       </div>
     </div>
   );
-    }
+        }
