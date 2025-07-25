@@ -153,10 +153,8 @@ export default function UserDashboard() {
   if (!user) return <p className="p-4 text-white">Loading...</p>;
 
   return (
-    <div
-  className="min-h-screen bg-[url('/stadium-bg_20250725_183319_0000.jpg')] bg-cover bg-center text-white"
->
-      <div className="bg-black bg-opacity-30 min-h-screen p-4 max-w-3xl mx-auto">
+    <div className="min-h-screen bg-[url('/stadium-bg_20250725_183319_0000.jpg')] bg-cover bg-center text-white">
+      <div className="max-w-3xl mx-auto p-4 bg-black/70 backdrop-blur-sm rounded-xl shadow-lg">
         <h1 className="text-2xl font-bold mb-1">Welcome, {username || 'User'}!</h1>
         <p className="mb-4">Total Points: <strong>{points}</strong></p>
 
