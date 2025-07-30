@@ -108,7 +108,7 @@ function getPercent(part, total) { if (!total || total === 0) return 0; return M
 
 if (!leagueId) return <p className="p-4">Loading...</p>;
 
-const pagedMembers = members.slice(page * pageSize, (page + 1) * pageSize);
+const pagedMembers = members.slice(page * pageSize, (page + 1) * pageSize); const totalPages = Math.ceil(members.length / pageSize);
 
 return ( <div className="p-4 max-w-4xl mx-auto"> <h1 className="text-2xl font-bold mb-4">League: {leagueName || 'Loading...'}</h1>
 
@@ -162,18 +162,17 @@ return ( <div className="p-4 max-w-4xl mx-auto"> <h1 className="text-2xl font-bo
     </table>
   </div>
 
-  {/* Pagination Controls */}
-  <div className="flex justify-between mb-6">
-    <button
-      onClick={() => setPage(p => Math.max(p - 1, 0))}
-      disabled={page === 0}
-      className="bg-gray-200 px-3 py-1 rounded disabled:opacity-50"
-    >Previous</button>
-    <button
-      onClick={() => setPage(p => (p + 1) * pageSize < members.length ? p + 1 : p)}
-      disabled={(page + 1) * pageSize >= members.length}
-      className="bg-gray-200 px-3 py-1 rounded disabled:opacity-50"
-    >Next</button>
+  {/* Numbered Pagination Controls */}
+  <div className="flex justify-center gap-2 mb-6">
+    {Array.from({ length: totalPages }, (_, i) => (
+      <button
+        key={i}
+        onClick={() => setPage(i)}
+        className={`px-3 py-1 rounded ${i === page ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
+      >
+        {i + 1}
+      </button>
+    ))}
   </div>
 
   <h2 className="text-xl font-semibold mb-2">Roll of Honour</h2>
