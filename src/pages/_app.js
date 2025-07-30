@@ -1,19 +1,24 @@
-import '@/styles/globals.css';
-import { useState } from 'react';
-import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
-import { SessionContextProvider } from '@supabase/auth-helpers-react';
+import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs';
 
-function MyApp({ Component, pageProps }) {
-  const [supabaseClient] = useState(() => createBrowserSupabaseClient());
+export const getServerSideProps = async (ctx) => {
+  const supabase = createServerSupabaseClient(ctx);
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  return (
-    <SessionContextProvider
-      supabaseClient={supabaseClient}
-      initialSession={pageProps.initialSession}
-    >
-      <Component {...pageProps} />
-    </SessionContextProvider>
-  );
-}
+  if (!session) {
+    return {
+      redirect: {
+        destination: '/',
+        permanent: false,
+      },
+    };
+  }
 
-export default MyApp;
+  return {
+    props: {
+      initialSession: session,
+      user: session.user,
+    },
+  };
+};
