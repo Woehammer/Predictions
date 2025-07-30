@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'; import { supabase } from '@/lib/supabaseclient'; import Link from 'next/link'; import { useSessionContext } from '@supabase/auth-helpers-react';
 
-export default function UserDashboard() { const { session, isLoading } = useSessionContext(); const user = session?.user;
+export default function UserDashboard({ user: initialUser }) { const { session, isLoading } = useSessionContext(); const user = session?.user ?? initialUser;
 
 const [points, setPoints] = useState(0); const [username, setUsername] = useState(''); const [leagues, setLeagues] = useState([]); const [publicLeagues, setPublicLeagues] = useState([]); const [inviteCode, setInviteCode] = useState(''); const [newLeagueName, setNewLeagueName] = useState(''); const [successMessage, setSuccessMessage] = useState(''); const [error, setError] = useState(''); const [recentResults, setRecentResults] = useState([]); const [upcomingFixtures, setUpcomingFixtures] = useState([]);
 
@@ -236,25 +236,9 @@ return ( <div className="min-h-screen bg-[url('/stadium-bg_20250725_183319_0000.
 
 import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs';
 
-export const getServerSideProps = async (ctx) => {
-  const supabase = createServerSupabaseClient(ctx);
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+export const getServerSideProps = async (ctx) => { const supabase = createServerSupabaseClient(ctx); const { data: { session }, } = await supabase.auth.getSession();
 
-  if (!session) {
-    return {
-      redirect: {
-        destination: '/',
-        permanent: false,
-      },
-    };
-  }
+if (!session) { return { redirect: { destination: '/', permanent: false, }, }; }
 
-  return {
-    props: {
-      initialSession: session,
-      user: session.user,
-    },
-  };
-};
+return { props: { initialSession: session, user: session.user, }, }; };
+
