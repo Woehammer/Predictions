@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'; import { supabase } from '@/lib/supabaseclient'; import Link from 'next/link'; import { useSessionContext } from '@supabase/auth-helpers-react';
+import { useEffect, useState } from 'react'; import { supabase } from '@/lib/supabaseclient'; import Link from 'next/link'; import { useSessionContext } from '@supabase/auth-helpers-react'; import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs';
 
 export default function UserDashboard({ user: initialUser }) { const { session, isLoading } = useSessionContext(); const user = session?.user ?? initialUser;
 
@@ -133,7 +133,7 @@ setLeagues((prev) => [...prev, newLeague]);
 
 const buttonClass = "w-40 sm:w-48 md:w-56 lg:w-64 mx-auto hover:scale-105 transition-transform duration-200";
 
-if (!user) return <p className="p-4 text-white">Loading...</p>;
+if (isLoading) return <p className="p-4 text-white">Loading session...</p>; if (!user) return <p className="p-4 text-white">Loading...</p>;
 
 return ( <div className="min-h-screen bg-[url('/stadium-bg_20250725_183319_0000.jpg')] bg-cover bg-center text-white"> <div className="max-w-3xl mx-auto p-4 bg-black/70 backdrop-blur-sm rounded-xl shadow-lg"> <h1 className="text-2xl font-bold mb-1">Welcome, {username || 'User'}!</h1> <p className="mb-4">Total Points: <strong>{points}</strong></p>
 
@@ -161,11 +161,7 @@ return ( <div className="min-h-screen bg-[url('/stadium-bg_20250725_183319_0000.
           className="border px-2 py-1 bg-white text-black flex-grow"
         />
         <button onClick={joinLeague}>
-          <img
-            src="/join-button_20250725_195612_0000.png"
-            alt="Join"
-            className={buttonClass}
-          />
+          <img src="/join-button_20250725_195612_0000.png" alt="Join" className={buttonClass} />
         </button>
       </div>
     </div>
@@ -206,8 +202,7 @@ return ( <div className="min-h-screen bg-[url('/stadium-bg_20250725_183319_0000.
       {recentResults.map((result, index) => (
         <li key={index} className="text-sm border-b py-2">
           {result.fixtures.home_team} {result.predicted_home_score}–
-          {result.predicted_away_score} vs actual{' '}
-          {result.fixtures.actual_home_score}–
+          {result.predicted_away_score} vs actual {result.fixtures.actual_home_score}–
           {result.fixtures.actual_away_score} {result.fixtures.away_team}
         </li>
       ))}
@@ -233,8 +228,6 @@ return ( <div className="min-h-screen bg-[url('/stadium-bg_20250725_183319_0000.
 </div>
 
 ); }
-
-import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs';
 
 export const getServerSideProps = async (ctx) => { const supabase = createServerSupabaseClient(ctx); const { data: { session }, } = await supabase.auth.getSession();
 
