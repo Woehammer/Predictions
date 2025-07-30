@@ -3,9 +3,9 @@ import { supabase } from '@/lib/supabaseclient';
 import Link from 'next/link';
 import { useSession } from '@supabase/auth-helpers-react';
 
-export default function UserProfile() {
+export default function UserProfile({ user: initialUser }) {
   const session = useSession();
-  const user = session?.user;
+  const user = session?.user ?? initialUser;
 
   const [points, setPoints] = useState(0);
   const [username, setUsername] = useState('');
@@ -83,74 +83,100 @@ export default function UserProfile() {
     }
   };
 
-  if (!user) return <p className="p-4">Loading...</p>;
+  if (!user) return <p className="p-4 text-white">Loading...</p>;
 
   return (
-    <div className="p-4 max-w-3xl mx-auto mt-6">
-      <h1 className="text-2xl font-bold mb-1">Welcome!</h1>
-      <p className="mb-2 text-sm text-gray-400 dark:text-gray-500">
-        Username: <span className="text-white font-semibold">{username}</span>
-      </p>
-      <p className="mb-4">
-        Total Points: <strong>{points}</strong>
-      </p>
+    <div className="min-h-screen bg-[url('/stadium-bg_20250725_183319_0000.jpg')] bg-cover bg-center text-white">
+      <div className="max-w-3xl mx-auto p-4 bg-black/70 backdrop-blur-sm rounded-xl shadow-lg mt-6">
+        <h1 className="text-2xl font-bold mb-1">Welcome!</h1>
+        <p className="mb-2 text-sm text-gray-300">
+          Username: <span className="text-white font-semibold">{username}</span>
+        </p>
+        <p className="mb-4">Total Points: <strong>{points}</strong></p>
 
-      <div className="mb-6 border p-4 rounded bg-white dark:bg-gray-900 dark:text-white shadow">
-        <h3 className="font-semibold mb-2">Update Profile</h3>
-        <input
-          type="text"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          className="border px-2 py-1 mb-2 w-full bg-white dark:bg-gray-800 dark:text-white rounded"
-          placeholder="Enter username"
-        />
-        <input
-          type="text"
-          value={favouriteTeam}
-          onChange={(e) => setFavouriteTeam(e.target.value)}
-          className="border px-2 py-1 mb-2 w-full bg-white dark:bg-gray-800 dark:text-white rounded"
-          placeholder="Favourite team"
-        />
-        <button
-          onClick={updateUsername}
-          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded w-full"
+        <div className="mb-6 border p-4 rounded bg-gray-900 shadow">
+          <h3 className="font-semibold mb-2">Update Profile</h3>
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            className="border px-2 py-1 mb-2 w-full bg-white text-black rounded"
+            placeholder="Enter username"
+          />
+          <input
+            type="text"
+            value={favouriteTeam}
+            onChange={(e) => setFavouriteTeam(e.target.value)}
+            className="border px-2 py-1 mb-2 w-full bg-white text-black rounded"
+            placeholder="Favourite team"
+          />
+          <button
+            onClick={updateUsername}
+            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded w-full"
+          >
+            Save Changes
+          </button>
+          {profileMessage && <p className="text-sm mt-2">{profileMessage}</p>}
+        </div>
+
+        <div className="mb-6 border p-4 rounded bg-gray-900 shadow">
+          <h3 className="font-semibold mb-2">Change Password</h3>
+          <input
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            className="border px-2 py-1 mb-2 w-full bg-white text-black rounded"
+            placeholder="New password"
+          />
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            className="border px-2 py-1 mb-2 w-full bg-white text-black rounded"
+            placeholder="Confirm new password"
+          />
+          <button
+            onClick={updatePassword}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded w-full"
+          >
+            Update Password
+          </button>
+          {passwordMessage && <p className="text-sm mt-2">{passwordMessage}</p>}
+        </div>
+
+        <Link
+          href="/dashboard"
+          className="block text-center bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded"
         >
-          Save Changes
-        </button>
-        {profileMessage && <p className="text-sm mt-2">{profileMessage}</p>}
+          Back to Dashboard
+        </Link>
       </div>
-
-      <div className="mb-6 border p-4 rounded bg-white dark:bg-gray-900 dark:text-white shadow">
-        <h3 className="font-semibold mb-2">Change Password</h3>
-        <input
-          type="password"
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-          className="border px-2 py-1 mb-2 w-full bg-white dark:bg-gray-800 dark:text-white rounded"
-          placeholder="New password"
-        />
-        <input
-          type="password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          className="border px-2 py-1 mb-2 w-full bg-white dark:bg-gray-800 dark:text-white rounded"
-          placeholder="Confirm new password"
-        />
-        <button
-          onClick={updatePassword}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded w-full"
-        >
-          Update Password
-        </button>
-        {passwordMessage && <p className="text-sm mt-2">{passwordMessage}</p>}
-      </div>
-
-      <Link
-        href="/dashboard"
-        className="block text-center bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded"
-      >
-        Back to Dashboard
-      </Link>
     </div>
   );
 }
+
+// Server-side session support
+import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs';
+
+export const getServerSideProps = async (ctx) => {
+  const supabase = createServerSupabaseClient(ctx);
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session) {
+    return {
+      redirect: {
+        destination: '/',
+        permanent: false,
+      },
+    };
+  }
+
+  return {
+    props: {
+      initialSession: session,
+      user: session.user,
+    },
+  };
+};
