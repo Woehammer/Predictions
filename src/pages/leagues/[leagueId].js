@@ -1,225 +1,244 @@
-import React, { useEffect, useState } from 'react'; import { useUser } from '@supabase/auth-helpers-react'; import { useRouter } from 'next/router'; import { supabase } from '@/lib/supabaseclient';
+import { useEffect, useState } from 'react'; import { supabase } from '@/lib/supabaseclient'; import Link from 'next/link'; import { useSessionContext } from '@supabase/auth-helpers-react';
 
-export default function LeaguePage() { const router = useRouter(); const { leagueId } = router.query; const user = useUser();
+export default function UserDashboard({ user: initialUser }) { const { session, isLoading } = useSessionContext(); const user = session?.user ?? initialUser;
 
-const [members, setMembers] = useState([]); const [leagueName, setLeagueName] = useState(''); const [messages, setMessages] = useState([]); const [newMessage, setNewMessage] = useState(''); const [honours, setHonours] = useState([]); const [userStats, setUserStats] = useState({}); const [hasChat, setHasChat] = useState(true); const [page, setPage] = useState(0); const pageSize = 50;
+const [points, setPoints] = useState(0); const [username, setUsername] = useState(''); const [leagues, setLeagues] = useState([]); const [publicLeagues, setPublicLeagues] = useState([]); const [inviteCode, setInviteCode] = useState(''); const [newLeagueName, setNewLeagueName] = useState(''); const [successMessage, setSuccessMessage] = useState(''); const [error, setError] = useState(''); const [recentResults, setRecentResults] = useState([]); const [upcomingFixtures, setUpcomingFixtures] = useState([]);
 
-useEffect(() => { if (leagueId) { fetchLeaderboard(); fetchMessages(); fetchHonours(); fetchUserStats(); } }, [leagueId]);
+useEffect(() => { if (isLoading || !user) return;
 
-const fetchLeaderboard = async () => { const { data: leagueData } = await supabase .from('leagues') .select('name, has_chat') .eq('id', leagueId) .single();
+const fetchData = async () => {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('username')
+    .eq('id', user.id)
+    .single();
 
-if (leagueData) {
-  setLeagueName(leagueData.name);
-  setHasChat(leagueData.has_chat);
-}
+  setUsername(profile?.username || '');
 
-const { data: leagueMembers, error: memberError } = await supabase
+  const { data: memberships } = await supabase
+    .from('league_members')
+    .select('league_id')
+    .eq('user_id', user.id);
+
+  const leagueIds = memberships?.map((m) => m.league_id) || [];
+
+  const { data: userLeagues } = await supabase
+    .from('leagues')
+    .select('id, name, is_public, invite_code')
+    .in('id', leagueIds);
+
+  setLeagues(userLeagues || []);
+
+  const { data: pointsData } = await supabase
+    .from('user_points')
+    .select('total_points')
+    .eq('user_id', user.id)
+    .single();
+
+  setPoints(pointsData?.total_points || 0);
+
+  const { data: publicData } = await supabase
+    .from('leagues')
+    .select()
+    .eq('is_public', true);
+
+  setPublicLeagues(publicData || []);
+
+  const { data: results } = await supabase
+    .from('predictions')
+    .select('fixtures(home_team, away_team, actual_home_score, actual_away_score), predicted_home_score, predicted_away_score')
+    .eq('user_id', user.id)
+    .not('fixtures.actual_home_score', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(5);
+
+  setRecentResults(results || []);
+
+  const { data: fixtures } = await supabase
+    .from('fixtures')
+    .select()
+    .gt('match_date', new Date().toISOString())
+    .order('match_date')
+    .limit(5);
+
+  setUpcomingFixtures(fixtures || []);
+};
+
+fetchData();
+
+}, [user, isLoading]);
+
+const joinLeague = async () => { if (!inviteCode.trim()) return;
+
+const { data: league, error: leagueError } = await supabase
+  .from('leagues')
+  .select('id, name, is_public, invite_code')
+  .eq('invite_code', inviteCode.trim())
+  .single();
+
+if (leagueError || !league) return setError('League not found.');
+
+const { data: existing } = await supabase
   .from('league_members')
-  .select('user_id')
-  .eq('league_id', leagueId);
+  .select('id')
+  .eq('user_id', user.id)
+  .eq('league_id', league.id)
+  .single();
 
-if (memberError) {
-  console.error('Error fetching league members:', memberError);
-  return;
-}
+if (existing) return setError('You are already a member of this league.');
 
-const userIds = leagueMembers.map((m) => m.user_id);
+const { error: insertError } = await supabase
+  .from('league_members')
+  .insert({ user_id: user.id, league_id: league.id });
 
-const { data: profiles } = await supabase
-  .from('profiles')
-  .select('id, username')
-  .in('id', userIds);
+if (insertError) return setError('Failed to join league.');
 
-const { data: scores } = await supabase
-  .from('league_scores_view')
-  .select('*')
-  .eq('league_id', leagueId);
+setSuccessMessage('Successfully joined the league!');
+setInviteCode('');
 
-const scoresById = {};
-for (const s of scores || []) {
-  scoresById[s.user_id] = s;
-}
+const { data: updatedLeagues } = await supabase
+  .from('leagues')
+  .select('id, name, is_public, invite_code')
+  .in('id', [...leagues.map((l) => l.id), league.id]);
 
-const combined = profiles.map((p) => {
-  const s = scoresById[p.id] || {
-    overall_score: 0,
-    month_score: 0,
-    week_score: 0,
-    last_week_score: 0,
-  };
-  return {
-    user_id: p.id,
-    username: p.username ?? p.id.slice(0, 6),
-    ...s,
-  };
-});
-
-const sorted = combined.sort((a, b) => b.overall_score - a.overall_score);
-setMembers(sorted);
+setLeagues(updatedLeagues || []);
 
 };
 
-const fetchUserStats = async () => { const { data, error } = await supabase .from('user_prediction_stats_view') .select('*') .eq('league_id', leagueId);
+const leaveLeague = async (leagueId) => { await supabase.from('league_members').delete().match({ user_id: user.id, league_id: leagueId }); setLeagues(leagues.filter((l) => l.id !== leagueId)); };
 
-if (!error) {
-  const statMap = {};
-  for (const row of data) {
-    statMap[row.user_id] = row;
-  }
-  setUserStats(statMap);
-}
-
-};
-
-const fetchHonours = async () => { const { data, error } = await supabase .from('monthly_honours_view') .select('month_label, username, month_points') .eq('league_id', leagueId) .order('month_start', { ascending: false }) .limit(6);
-
-if (!error) setHonours(data);
-
-};
-
-const fetchMessages = async () => { if (!hasChat) return;
+const createLeague = async () => { setError(''); setSuccessMessage(''); if (!newLeagueName.trim()) return setError('Please enter a league name.');
 
 const { data, error } = await supabase
-  .from('league_messages')
-  .select('message, created_at, user_id, profiles ( username )')
-  .eq('league_id', leagueId)
-  .order('created_at', { ascending: true });
+  .from('leagues')
+  .insert([{ name: newLeagueName, is_public: false, invite_code: null, creator_id: user.id }])
+  .select()
+  .single();
 
-if (!error) setMessages(data);
+if (error) return setError('Failed to create league.');
 
-};
+const newLeague = data;
 
-const sendMessage = async () => { if (!newMessage.trim()) return;
+const { error: memberError } = await supabase
+  .from('league_members')
+  .insert([{ league_id: newLeague.id, user_id: user.id }]);
 
-const { error } = await supabase.from('league_messages').insert({
-  league_id: leagueId,
-  user_id: user.id,
-  message: newMessage.trim(),
-});
+if (memberError) return setError('League created, but failed to join.');
 
-if (!error) {
-  setNewMessage('');
-  fetchMessages();
-}
+setNewLeagueName('');
+setSuccessMessage(`League "${newLeague.name}" created!`);
+setLeagues((prev) => [...prev, newLeague]);
 
 };
 
-function getPercent(part, total) { if (!total || total === 0) return 0; return Math.round((part / total) * 100); }
+const buttonClass = "w-40 sm:w-48 md:w-56 lg:w-64 mx-auto hover:scale-105 transition-transform duration-200";
 
-if (!leagueId) return <p className="p-4">Loading...</p>;
+if (!user) return <p className="p-4 text-white">Loading...</p>;
 
-const pagedMembers = members.slice(page * pageSize, (page + 1) * pageSize); const totalPages = Math.ceil(members.length / pageSize);
+return ( <div className="min-h-screen bg-[url('/stadium-bg_20250725_183319_0000.jpg')] bg-cover bg-center text-white"> <div className="max-w-3xl mx-auto p-4 bg-black/70 backdrop-blur-sm rounded-xl shadow-lg"> <h1 className="text-2xl font-bold mb-1">Welcome, {username || 'User'}!</h1> <p className="mb-4">Total Points: <strong>{points}</strong></p>
 
-return ( <div className="p-4 max-w-4xl mx-auto"> <h1 className="text-2xl font-bold mb-4">League: {leagueName || 'Loading...'}</h1>
-
-<h2 className="text-xl font-semibold mb-2">Leaderboard</h2>
-
-  <div className="mb-4 border rounded">
-    <table className="min-w-full table-auto">
-      <thead className="bg-gray-100 dark:bg-gray-800">
-        <tr>
-          <th className="px-4 py-2 text-left">#</th>
-          <th className="px-4 py-2 text-left">Username</th>
-          <th className="px-4 py-2 text-center">Overall</th>
-          <th className="px-4 py-2 text-center">This Month</th>
-          <th className="px-4 py-2 text-center">This Week</th>
-        </tr>
-      </thead>
-      <tbody>
-        {pagedMembers.map((m, i) => {
-          const diff = m.week_score - m.last_week_score;
-          const diffColor = diff > 0 ? 'text-green-600' : diff < 0 ? 'text-red-500' : 'text-gray-400';
-          const stats = userStats[m.user_id];
-          return (
-            <tr key={m.user_id} className={`border-t ${user?.id === m.user_id ? 'bg-yellow-100 dark:bg-yellow-900' : ''}`}>
-              <td className="px-4 py-2">{i + 1 + page * pageSize}</td>
-              <td className="px-4 py-2 relative group">
-                {m.username}
-                {stats && (
-                  <div className="absolute z-10 top-full left-0 mt-1 w-64 bg-white dark:bg-gray-800 shadow-md border rounded p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
-                    <p className="font-semibold mb-1">{m.username}</p>
-                    <p>Total Score: {stats.total_score}</p>
-                    <p>Exact Scores: {stats.exact_predictions}</p>
-                    <p>Bonus Avg: {parseFloat(stats.avg_bonus_score || 0).toFixed(2)}</p>
-                    <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
-                      Accuracy:<br />
-                      - Exact: {getPercent(stats.exact_count, stats.total_predictions)}%<br />
-                      - Winner: {getPercent(stats.winner_count, stats.total_predictions)}%<br />
-                      - Wrong: {getPercent(stats.wrong_count, stats.total_predictions)}%
-                    </p>
-                  </div>
-                )}
-              </td>
-              <td className="px-4 py-2 text-center">{m.overall_score}</td>
-              <td className="px-4 py-2 text-center">{m.month_score}</td>
-              <td className="px-4 py-2 text-center">
-                {m.week_score} <span className={`text-sm ${diffColor}`}>({diff > 0 ? '+' : ''}{diff})</span>
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
-  </div>
-
-  {/* Numbered Pagination Controls */}
-  <div className="flex justify-center gap-2 mb-6">
-    {Array.from({ length: totalPages }, (_, i) => (
-      <button
-        key={i}
-        onClick={() => setPage(i)}
-        className={`px-3 py-1 rounded ${i === page ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}
-      >
-        {i + 1}
-      </button>
-    ))}
-  </div>
-
-  <h2 className="text-xl font-semibold mb-2">Roll of Honour</h2>
-  {honours.length === 0 ? (
-    <p className="text-gray-500 mb-6">No monthly winners yet.</p>
-  ) : (
-    <ul className="mb-6 border rounded divide-y">
-      {honours.map((h, i) => (
-        <li key={i} className="px-4 py-2">
-          <div className="flex justify-between w-full">
-            <span className="font-medium">{h.month_label.trim()}</span>
-            <span>{h.username} ({h.month_points} pts)</span>
+<h2 className="text-xl font-semibold mt-6 mb-2">Your Leagues</h2>
+    <ul className="mb-4">
+      {leagues.map((league) => (
+        <li key={league.id} className="flex justify-between items-center border-b py-2">
+          <div>
+            <Link href={`/leagues/${league.id}`} className="text-blue-300 underline hover:text-blue-500">
+              {league.name}
+            </Link>
           </div>
+          <button onClick={() => leaveLeague(league.id)} className="text-red-400 text-sm">Leave</button>
         </li>
       ))}
     </ul>
-  )}
 
-  {hasChat && (
-    <>
-      <h2 className="text-xl font-semibold mb-2">Chat</h2>
-      <div className="border rounded h-64 overflow-y-auto p-2 mb-2 bg-white dark:bg-gray-900">
-        {messages.map((msg, idx) => (
-          <div key={idx} className="mb-1">
-            <span className="text-sm text-gray-600 dark:text-gray-400">
-              {msg.profiles?.username || msg.user_id.slice(0, 6)}:
-            </span>{' '}
-            <span>{msg.message}</span>
-          </div>
-        ))}
-      </div>
-      <div className="flex gap-2">
+    <div className="mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-6">
         <input
           type="text"
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          className="border rounded p-1 flex-1"
-          placeholder="Type a message..."
+          value={inviteCode}
+          onChange={(e) => setInviteCode(e.target.value)}
+          placeholder="Enter invite code"
+          className="border px-2 py-1 bg-white text-black flex-grow"
         />
-        <button
-          onClick={sendMessage}
-          className="bg-blue-500 text-white px-4 py-1 rounded"
-        >Send</button>
+        <button onClick={joinLeague}>
+          <img
+            src="/join-button_20250725_195612_0000.png"
+            alt="Join"
+            className={buttonClass}
+          />
+        </button>
       </div>
-    </>
-  )}
+    </div>
+
+    <div className="mb-6 border p-4 rounded bg-gray-900">
+      <h3 className="text-lg font-semibold mb-2">Create New League</h3>
+      {successMessage && <p className="text-green-400 mb-2">{successMessage}</p>}
+      {error && <p className="text-red-400 mb-2">{error}</p>}
+      <input
+        type="text"
+        value={newLeagueName}
+        onChange={(e) => setNewLeagueName(e.target.value)}
+        placeholder="League name"
+        className="border px-2 py-1 w-full mb-2 bg-white text-black"
+      />
+      <button onClick={createLeague} className="w-full">
+        <img
+          src="/createleague-button_20250725_200715_0000.png"
+          alt="Create League"
+          className={buttonClass}
+        />
+      </button>
+    </div>
+
+    <h2 className="text-xl font-semibold mt-6 mb-2">Public Leagues</h2>
+    <ul className="mb-6">
+      {publicLeagues.map((league) => (
+        <li key={league.id} className="border-b py-2">
+          <Link href={`/leagues/${league.id}`} className="text-blue-300 underline hover:text-blue-500">
+            {league.name}
+          </Link>
+        </li>
+      ))}
+    </ul>
+
+    <h2 className="text-xl font-semibold mt-6 mb-2">Recent Results</h2>
+    <ul className="mb-6">
+      {recentResults.map((result, index) => (
+        <li key={index} className="text-sm border-b py-2">
+          {result.fixtures.home_team} {result.predicted_home_score}–
+          {result.predicted_away_score} vs actual{' '}
+          {result.fixtures.actual_home_score}–
+          {result.fixtures.actual_away_score} {result.fixtures.away_team}
+        </li>
+      ))}
+    </ul>
+
+    <h2 className="text-xl font-semibold mt-6 mb-2">Upcoming Fixtures</h2>
+    <ul className="mb-6">
+      {upcomingFixtures.map((f) => (
+        <li key={f.id} className="text-sm border-b py-2">
+          {f.home_team} vs {f.away_team} — {new Date(f.match_date).toLocaleString()}
+        </li>
+      ))}
+    </ul>
+
+    <Link href="/predictions">
+      <img
+        src="/prediction-button_20250725_195023_0000.png"
+        alt="Go to Predictions"
+        className={buttonClass + " my-6"}
+      />
+    </Link>
+  </div>
 </div>
 
 ); }
+
+import { createServerSupabaseClient } from '@supabase/auth-helpers-nextjs';
+
+export const getServerSideProps = async (ctx) => { const supabase = createServerSupabaseClient(ctx); const { data: { session }, } = await supabase.auth.getSession();
+
+if (!session) { return { redirect: { destination: '/', permanent: false, }, }; }
+
+return { props: { initialSession: session, user: session.user, }, }; };
 
