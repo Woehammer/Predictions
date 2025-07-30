@@ -14,7 +14,7 @@ export default function AuthPage() {
       : await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
-      alert((isSignup ? 'Signup' : 'Login') + ' failed: ' + error.message);
+      alert(`${isSignup ? 'Signup' : 'Login'} failed: ${error.message}`);
     } else {
       router.push('/dashboard');
     }
@@ -34,50 +34,56 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="p-4 max-w-md mx-auto">
-      <h1 className="text-xl font-bold mb-4">{isSignup ? 'Sign Up' : 'Login'}</h1>
+    <div className="min-h-screen bg-[url('/stadium-bg_20250725_183319_0000.jpg')] bg-cover bg-center text-white">
+      <div className="min-h-screen flex items-center justify-center bg-black/70 backdrop-blur-sm">
+        <div className="bg-black/80 p-8 rounded-lg shadow-lg w-full max-w-md">
+          <h1 className="text-2xl font-bold mb-6 text-center">
+            {isSignup ? 'Sign Up' : 'Login to Predictify'}
+          </h1>
 
-      <input
-        type="email"
-        placeholder="Email"
-        className="border p-2 block w-full mb-2"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
+          <input
+            type="email"
+            placeholder="Email"
+            className="border p-2 w-full mb-4 rounded bg-white text-black"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
 
-      <input
-        type="password"
-        placeholder="Password"
-        className="border p-2 block w-full mb-4"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
+          <input
+            type="password"
+            placeholder="Password"
+            className="border p-2 w-full mb-6 rounded bg-white text-black"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
 
-      <button
-        className="bg-blue-600 text-white p-2 w-full rounded mb-4"
-        onClick={handleEmailAuth}
-      >
-        {isSignup ? 'Sign Up' : 'Login'}
-      </button>
+          <button
+            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold p-2 w-full rounded mb-4"
+            onClick={handleEmailAuth}
+          >
+            {isSignup ? 'Sign Up' : 'Login'}
+          </button>
 
-      <div className="text-center my-2 text-gray-500">or</div>
+          <div className="text-center text-gray-300 my-2">or</div>
 
-      <button
-        className="bg-red-600 text-white p-2 w-full rounded mb-4"
-        onClick={handleGoogleLogin}
-      >
-        Continue with Google
-      </button>
+          <button
+            className="bg-red-600 hover:bg-red-700 text-white font-semibold p-2 w-full rounded mb-6"
+            onClick={handleGoogleLogin}
+          >
+            Continue with Google
+          </button>
 
-      <p className="text-center text-sm">
-        {isSignup ? 'Already have an account?' : "Don't have an account?"}{' '}
-        <button
-          className="text-blue-500 underline"
-          onClick={() => setIsSignup(!isSignup)}
-        >
-          {isSignup ? 'Log In' : 'Sign Up'}
-        </button>
-      </p>
+          <p className="text-center text-sm text-gray-300">
+            {isSignup ? 'Already have an account?' : "Don't have an account?"}{' '}
+            <button
+              className="text-yellow-400 underline hover:text-yellow-300"
+              onClick={() => setIsSignup(!isSignup)}
+            >
+              {isSignup ? 'Log In' : 'Sign Up'}
+            </button>
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
