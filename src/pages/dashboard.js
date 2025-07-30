@@ -131,6 +131,8 @@ setLeagues((prev) => [...prev, newLeague]);
 
 };
 
+const buttonClass = "w-40 sm:w-48 md:w-56 lg:w-64 mx-auto hover:scale-105 transition-transform duration-200";
+
 if (!user) return <p className="p-4 text-white">Loading...</p>;
 
 return ( <div className="min-h-screen bg-[url('/stadium-bg_20250725_183319_0000.jpg')] bg-cover bg-center text-white"> <div className="max-w-3xl mx-auto p-4 bg-black/70 backdrop-blur-sm rounded-xl shadow-lg"> <h1 className="text-2xl font-bold mb-1">Welcome, {username || 'User'}!</h1> <p className="mb-4">Total Points: <strong>{points}</strong></p>
@@ -162,7 +164,7 @@ return ( <div className="min-h-screen bg-[url('/stadium-bg_20250725_183319_0000.
           <img
             src="/join-button_20250725_195612_0000.png"
             alt="Join"
-            className="w-40 hover:scale-105 transition-transform duration-200"
+            className={buttonClass}
           />
         </button>
       </div>
@@ -183,7 +185,7 @@ return ( <div className="min-h-screen bg-[url('/stadium-bg_20250725_183319_0000.
         <img
           src="/createleague-button_20250725_200715_0000.png"
           alt="Create League"
-          className="w-full max-w-xs mx-auto hover:scale-105 transition-transform duration-200"
+          className={buttonClass}
         />
       </button>
     </div>
@@ -224,7 +226,7 @@ return ( <div className="min-h-screen bg-[url('/stadium-bg_20250725_183319_0000.
       <img
         src="/prediction-button_20250725_195023_0000.png"
         alt="Go to Predictions"
-        className="w-48 sm:w-64 mx-auto my-6 hover:scale-105 transition-transform duration-200"
+        className={buttonClass + " my-6"}
       />
     </Link>
   </div>
