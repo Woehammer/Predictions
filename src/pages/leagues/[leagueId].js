@@ -114,7 +114,7 @@ return ( <div className="p-4 max-w-4xl mx-auto"> <h1 className="text-2xl font-bo
 
 <h2 className="text-xl font-semibold mb-2">Leaderboard</h2>
 
-  <div className="overflow-x-auto mb-4 border rounded">
+  <div className="mb-4 border rounded">
     <table className="min-w-full table-auto">
       <thead className="bg-gray-100 dark:bg-gray-800">
         <tr>
