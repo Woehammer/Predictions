@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../../lib/supabaseclient';
 
@@ -8,6 +8,21 @@ export default function AuthPage() {
   const [password, setPassword] = useState('');
   const [isSignup, setIsSignup] = useState(false);
 
+  // Watch for auth session changes (email or Google login)
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN') {
+        router.push('/dashboard');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
   const handleEmailAuth = async () => {
     const { error } = isSignup
       ? await supabase.auth.signUp({ email, password })
@@ -15,13 +30,8 @@ export default function AuthPage() {
 
     if (error) {
       alert(`${isSignup ? 'Signup' : 'Login'} failed: ${error.message}`);
-    } else {
-      const {data: {session}, error} = await supabase.auth.signInWithPassword({email,password});
-      if (error) {
-        alert('Login failed: ' + error.message);
-      } else if (session) {
-        router.push('/dashboard');
     }
+    // No need to manually redirect — the useEffect above will handle it
   };
 
   const handleGoogleLogin = async () => {
