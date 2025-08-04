@@ -16,7 +16,11 @@ export default function AuthPage() {
     if (error) {
       alert(`${isSignup ? 'Signup' : 'Login'} failed: ${error.message}`);
     } else {
-      router.push('/dashboard');
+      const {data: {session}, error} = await supabase.auth.signInWithPassword({email,password});
+      if (error) {
+        alert('Login failed: ' + error.message);
+      } else if (session) {
+        router.push('/dashboard');
     }
   };
 
